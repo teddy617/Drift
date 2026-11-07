@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0a0e1f">
+<title>Drift</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=IM+Fell+English:ital@0;1&family=Caveat&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a0e1f;--card:#121832;--paper:#eadfc4;--brass:#c9a96a;--dusk:#8e92a8;--line:#2a3160}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:var(--bg);color:var(--paper);font:15px 'DM Sans',system-ui,sans-serif}
+body{display:flex;flex-direction:column;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+h1,h2{font-family:'IM Fell English',Georgia,serif;font-weight:400}
+#sky{position:relative;padding:14px 16px 12px;min-height:92px;overflow:hidden;transition:background 1.2s;text-shadow:0 1px 6px #0009}
+#stars{position:absolute;inset:0;transition:opacity 1.2s;pointer-events:none}
+#sky>:not(#stars){position:relative}
+#sky h1{font-size:32px;font-style:italic}
+#sky p{font-size:13px;line-height:1.5}
+nav{display:flex;border-bottom:1px solid var(--line)}
+nav button{flex:1;background:none;border:0;color:var(--dusk);padding:11px;font:inherit}
+nav button.on{color:var(--brass);box-shadow:inset 0 -2px var(--brass)}
+#map{flex:1;min-height:200px}
+.leaflet-tile-pane{filter:sepia(.45) saturate(.8) brightness(1.05)}
+.star{color:var(--brass);font-size:28px;text-shadow:0 0 12px var(--brass);line-height:1}
+#panel{background:var(--card);padding:12px 16px 14px;border-top:1px solid var(--line);max-height:60vh;overflow:auto}
+.row{display:flex;gap:8px;margin-bottom:10px}
+.seg{flex:1;padding:9px;border:1px solid var(--line);background:none;color:var(--dusk);border-radius:8px;font:inherit}
+.seg.on{border-color:var(--brass);color:var(--paper);background:#1a2147}
+input[type=text],textarea,input[type=datetime-local]{width:100%;background:#0c1126;border:1px solid var(--line);border-radius:8px;color:var(--paper);padding:9px;font:inherit}
+input[type=range]{width:100%;accent-color:var(--brass)}
+label{display:block;font-size:13px;color:var(--dusk);margin:8px 0 4px}
+.go{display:block;width:100%;padding:12px;border:0;border-radius:10px;background:var(--brass);color:#1a1405;font:400 20px 'IM Fell English',Georgia,serif;text-align:center;text-decoration:none}
+.go:disabled{opacity:.5}
+.ghost{background:none;border:1px solid var(--brass);color:var(--brass)}
+.note{color:var(--dusk);font-size:12px;margin-top:8px}
+#result{margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:10px;display:none}
+#result h2{font-size:28px;line-height:1.1}
+#rd{color:var(--dusk);margin:4px 0 12px}
+#journal{display:none;flex:1;overflow:auto;padding:16px}
+.entry{background:var(--paper);color:#2a2418;border-radius:3px;padding:14px;margin-bottom:16px;box-shadow:0 4px 14px #0008}
+.entry h2{font-size:24px}
+.entry img{width:100%;border:8px solid #fff;border-bottom-width:28px;margin:10px 0;box-shadow:0 2px 8px #0005}
+.entry p{white-space:pre-wrap;margin-top:6px}
+.entry small{display:block;color:#7a6e55;margin-top:4px}
+.entry a{color:#7a6e55}
+dialog{margin:auto;width:min(92vw,420px);background:var(--card);color:var(--paper);border:1px solid var(--brass);border-radius:12px;padding:16px}
+dialog::backdrop{background:#000a}
+button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+#gear{position:absolute!important;top:10px;right:12px;background:none;border:0;color:var(--paper);font-size:24px;padding:4px 8px}
+#th{font-size:14px;line-height:1.5;margin-bottom:12px}
+#th p{margin:0 0 10px}
+#th a,#cc a{color:var(--brass)}
+#sky.rain:after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(100deg,transparent 0 7px,#ffffff30 7px 8px);animation:fall .6s linear infinite;pointer-events:none}
+@keyframes fall{to{background-position:-20px 60px}}
+body.red{filter:grayscale(1) sepia(1) hue-rotate(-55deg) saturate(6) brightness(.65)}
+#ov{position:fixed;inset:0;z-index:2000;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;background:radial-gradient(circle,#1a2147,#04060f);animation:bleed 1.6s ease-out}
+#ov h2{font-size:40px}
+@keyframes bleed{from{clip-path:circle(0)}to{clip-path:circle(150%)}}
+@media print{html,body{height:auto;background:#fff}body>*:not(#journal){display:none!important}#journal{display:block!important;overflow:visible;padding:0}.entry{box-shadow:none;border:1px solid #999;break-inside:avoid}#journal .row{display:none}}
+#skybtn{position:absolute!important;top:12px;right:52px;background:none;border:1px solid var(--paper);border-radius:14px;color:var(--paper);font:inherit;font-size:13px;padding:3px 10px}
+#hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:900;background:var(--card);border:1px solid var(--brass);color:var(--paper);padding:8px 14px;border-radius:18px;font-size:14px;pointer-events:none;max-width:90%;text-align:center}
+.dk{filter:invert(1) hue-rotate(200deg) brightness(.8) contrast(.9) saturate(.5)}
+#sg{position:fixed;inset:0;z-index:1500;display:none;align-items:center;justify-content:center;background:#04060fcc}
+#sgp{animation:draw 1.4s ease forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+@media(prefers-reduced-motion:reduce){#sgp{stroke-dashoffset:0!important}}
+#sky.aurora:before{content:'';position:absolute;inset:0;background:linear-gradient(100deg,transparent,#3dff9a55,#7a5cff44,transparent);background-size:200% 100%;animation:drift 8s ease-in-out infinite alternate;pointer-events:none}
+@keyframes drift{to{background-position:100% 0}}
+#mus{position:absolute!important;top:10px;right:108px;background:none;border:0;color:var(--paper);font-size:22px;padding:4px 8px;opacity:.6}
+.entry p,#note{font-family:Caveat,'IM Fell English',cursive;font-size:20px;line-height:1.25}
+.ph{position:relative;margin:10px 0;box-shadow:0 2px 8px #0005;background:#fff}
+.ph img{margin:0!important;box-shadow:none!important;display:block;filter:sepia(.25) contrast(1.08) saturate(.9)}
+.ph:after{content:'';position:absolute;inset:8px 8px 28px 8px;pointer-events:none;mix-blend-mode:overlay;opacity:.45;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+#pa{position:fixed;inset:0;z-index:1800;display:none;flex-direction:column;align-items:center;justify-content:center;background:#000;color:#8e92a8}
+.star.gold{font-size:40px;color:#ffd86b;text-shadow:0 0 16px #ffd86b,0 0 30px #ffd86b}
+#kinds{flex-wrap:wrap}#kinds .seg{flex:1 1 auto;padding:9px 8px}
+.vs{font:italic 19px/1.45 'IM Fell English',Georgia,serif;color:var(--paper);margin-top:10px}
+.vs small{display:block;font:12px 'DM Sans',system-ui,sans-serif;font-style:normal;color:var(--dusk);margin-top:6px}
+.dr{color:#eadfc4;opacity:.65;font:italic 15px 'IM Fell English',Georgia,serif;white-space:nowrap;text-align:center;text-shadow:0 0 6px #000;pointer-events:none}
+.clip{background:#e8dcb8;color:#2a2418;padding:14px 12px;margin:8px 0;border:1px solid #8a7a52;box-shadow:0 3px 10px #0008;transform:rotate(-.6deg);clip-path:polygon(0 1%,4% 0,9% 1.2%,15% 0,22% 1%,30% 0,38% 1.2%,46% 0,55% 1%,63% 0,72% 1.2%,80% 0,88% 1%,95% 0,100% 1%,100% 99%,94% 100%,86% 98.8%,77% 100%,69% 99%,60% 100%,51% 98.8%,42% 100%,33% 99%,24% 100%,15% 98.8%,7% 100%,0 99%)}
+.clip .mh{font:700 20px/1.1 'IM Fell English',Georgia,serif;text-align:center;letter-spacing:.08em;border-bottom:3px double #2a2418;padding-bottom:6px}
+.clip .dl{font-size:11px;text-align:center;text-transform:uppercase;letter-spacing:.12em;margin:4px 0 8px;color:#5a4a28}
+.clip article{border-top:1px solid #8a7a52;padding:8px 0}
+.clip h3{font:400 17px/1.15 'IM Fell English',Georgia,serif}
+.clip p{font:13px/1.4 Georgia,serif;margin:4px 0;color:#2a2418;text-align:justify;hyphens:auto}
+.clip small{color:#5a4a28;display:block}
+.clip a{color:#5a3a10}
+.nbp{font-size:20px;line-height:26px;text-align:center;width:26px;height:26px;border-radius:50%;background:var(--card);border:1px solid var(--brass);box-shadow:0 0 8px #0009}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--card);color:var(--paper)}
+.leaflet-popup-content{margin:10px;font-size:13px;line-height:1.4}
+.leaflet-popup-content .clip{margin:0}
+#journal .row{flex-wrap:wrap}
+#apd,#sd{overflow:auto;max-height:94vh}
+.home{width:18px;height:18px;border-radius:50%;background:var(--brass);border:2px solid #eadfc4;box-shadow:0 0 10px var(--brass)}
+select{width:100%;background:#0c1126;border:1px solid var(--line);border-radius:8px;color:var(--paper);padding:9px;font:inherit}
+#map.aged .dk{filter:none}
+#map.aged .leaflet-tile-pane{filter:sepia(.95) saturate(.85) contrast(.95) brightness(1.02)}
+
+#ar{margin:4px 0 14px}
+#ar h4{font:600 12px 'DM Sans',system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--dusk);margin:16px 0 6px}
+#ar details{background:#ffffff08;border:1px solid var(--line);border-radius:12px;margin:8px 0;padding:0 14px}
+#ar summary{padding:12px 0;color:var(--paper);list-style:none;cursor:pointer;font-size:15px}
+#ar summary::-webkit-details-marker{display:none}
+#ar summary:after{content:'+';float:right;color:var(--brass);font-size:18px;line-height:1}
+#ar details[open] summary:after{content:'\2212'}
+#ar .bd{padding:0 0 12px}
+#ar .bd p{margin:0 0 9px}
+#ar .bd small{display:block;color:var(--dusk);font-size:12px}
+#ar .strip{display:flex;gap:10px;overflow-x:auto;padding:2px 0 8px}
+#ar .strip a{flex:0 0 auto;width:132px;font-size:11px;line-height:1.3;color:var(--dusk);text-decoration:none}
+#ar .strip img{width:132px;height:100px;object-fit:cover;border-radius:6px;display:block;margin-bottom:3px;filter:sepia(.2)}
+#ar .rw{display:flex;gap:10px;align-items:center;margin:0 0 9px}
+#ar .rw img{width:44px;height:44px;border-radius:50%;object-fit:cover;flex:0 0 auto}
+#ar table{width:100%;border-collapse:collapse;font-size:13px}
+#ar td,#ar th{padding:5px 4px;border-bottom:1px solid var(--line);text-align:left}
+#ar .sub{color:var(--paper);font-size:12px;letter-spacing:.08em;text-transform:uppercase;margin:12px 0 6px;opacity:.8}
+#ar .svb{width:100%;margin:0 0 12px;font-size:13px;padding:8px}
+#sky{cursor:pointer;min-height:0}#sky:after{content:'▾';position:absolute;right:16px;bottom:8px;opacity:.7}#sky.open:after{content:'▴'}
+#sky:not(.open) #s,#sky:not(.open) #x,#sky:not(.open) #tdl{display:none}
+#skyx{display:none;margin-top:8px}#sky.open #skyx{display:block}#skyx label{color:var(--paper)}
+#grab{display:flex;align-items:center;justify-content:center;gap:10px;padding:4px 0 8px;color:var(--dusk);font-size:12px;cursor:pointer;touch-action:none;user-select:none}
+#grab i{width:38px;height:4px;border-radius:2px;background:var(--line)}
+#panel:not(.up) .xtra{display:none}
+#hint{bottom:auto;top:12px}
+#around{display:none;flex:1;overflow:auto;padding:14px 16px}
+#around>#th>p{margin:0 0 10px}
+</style></head><body>
+<header id="sky"><div id="stars"></div><h1>Drift</h1><button id="gear" aria-label="Settings">⚙</button><button id="skybtn">Sky</button><button id="mus" aria-label="Ambient music">♪</button><p id="m">Finding your sky</p><p id="s"></p><p id="w"></p><p id="x"></p><p id="tdl"></p><div id="skyx"><label for="tsl">Slide the sky through the next 24 hours: <b id="tsv">now</b></label><input type="range" id="tsl" min="0" max="96" value="0"><button class="seg" id="tnow" style="margin-top:6px;width:100%">Back to now</button></div></header>
+<nav><button id="t1" class="on">Explore</button><button id="t3">Around</button><button id="t2">Journal</button></nav>
+<div id="map"></div>
+<section id="panel"><div id="grab"><i></i><span id="gt">Options ▴</span></div><button class="go" id="go">Find a place</button>
+ <p class="note">Land access can't be verified. Stay off private property.</p>
+ <div id="result"><h2 id="rn"></h2><p id="rd"></p>
+ <div class="row" style="margin:0 0 8px"><a class="go ghost" id="rmap" target="_blank" rel="noopener" style="flex:1;font-size:15px;padding:11px 4px">Directions</a><button class="go ghost" id="walk" style="flex:1;font-size:15px;padding:11px 4px">Start journey</button><button class="go" id="arr" style="flex:1;font-size:15px;padding:11px 4px">I’ve arrived</button></div>
+<div id="tr" style="display:none;text-align:center;margin-bottom:8px"><svg viewBox="0 0 100 100" width="150" height="150"><path d="M50 0L54 7H46Z" fill="#c9a96a"/><g id="rs1" style="transform-origin:50px 50px"><circle cx="50" cy="50" r="31" fill="none" stroke="#c9a96a" stroke-opacity=".5" stroke-dasharray="1 3"/><text x="50" y="16" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="#d18a4a">N</text><text x="50" y="92" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="#eadfc4">S</text><text x="90" y="54" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="#eadfc4">E</text><text x="10" y="54" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="#eadfc4">W</text><g id="nd" style="transform-origin:50px 50px"><path d="M50 21L57 52L50 47L43 52Z" fill="#c9a96a" stroke="#1a1405" stroke-width=".8"/></g></g></svg><p id="td" style="color:var(--dusk)"></p><p class="note" style="margin:0 0 8px">Gold arrow: your destination. N is true north.</p><button class="seg" id="paBtn" style="width:100%">Phone away</button></div>
+<button class="go ghost" id="goAr" style="font-size:15px;padding:11px">What’s around here →</button><div class="xtra"><button class="go ghost" id="seal" style="margin-top:8px;font-size:15px;padding:11px">Send as a sealed link</button></div></div>
+<div class="xtra">
+ <div class="row"><button class="seg on" id="m1">Random</button><button class="seg" id="m2">Intention</button><button class="seg" id="m3">Dream</button></div>
+ <div class="row" id="kinds"><button class="seg on" id="k0">Any</button><button class="seg" id="k1">Attractor</button><button class="seg" id="k2">Void</button><button class="seg" id="k3">Anomaly</button><button class="seg" id="k4">Dark sky</button></div><p class="note" id="kn" style="margin:-2px 0 8px"></p>
+ <p class="note" style="margin:-4px 0 8px">Attractor is where random points cluster, void is where they thin out, anomaly is where two draws nearly collide. Dark sky leans toward spots far from towns and cities, a rough guess from map data.</p>
+ <input type="text" id="intent" aria-label="Intention" placeholder="What are you hoping to find?" style="display:none;margin-bottom:6px">
+ <div class="row" style="margin-bottom:8px"><button class="seg" id="loc">Use my location</button><button class="seg" id="mv">Move start on map</button></div>
+ <div class="row" style="margin-bottom:8px"><input type="text" id="sq" aria-label="Search a town or address" placeholder="Or search a town or address" style="flex:1"><button class="seg" id="sg2" style="flex:0 0 auto;padding:9px 16px">Go</button></div>
+ <label for="rad">Radius: <b id="rl"></b></label><input type="range" id="rad" min="0" max="100" value="35">
+ <label>Getting there</label><div class="row" id="tmr"><button class="seg on" id="tm0">Walk</button><button class="seg" id="tm1">Bike</button><button class="seg" id="tm2">Drive</button></div>
+ <label for="when">Going at (leave blank for now)</label><input type="datetime-local" id="when">
+ <div style="height:12px"></div>
+ </div></section>
+<section id="around"><div id="th"><p class="note">Find a place on the Explore tab, then come back here for its stories, old newspapers, books, photos, wildlife and history.</p></div></section>
+<section id="journal"></section>
+<dialog id="dlg"><h2 id="dn" style="font-size:26px"></h2><p id="dv" class="vs" style="font-size:16px;margin:4px 0 8px"></p>
+ <label for="note">What did you notice?</label><textarea id="note" rows="4"></textarea>
+ <label for="pic">Photo</label><input type="file" id="pic" accept="image/*"><div id="rv"></div>
+ <label for="item">Something you picked up? (optional)</label><input type="text" id="item" placeholder="a leaf, a stone, a feather">
+ <label for="mb">Mood when you set out: <b id="mbv">3</b></label><input type="range" id="mb" min="1" max="5" value="3">
+ <label for="ma">Mood now: <b id="mav">3</b></label><input type="range" id="ma" min="1" max="5" value="3">
+ <label>Sketch</label><canvas id="sk" width="320" height="180" style="width:100%;background:#0c1126;border:1px solid var(--line);border-radius:8px;touch-action:none"></canvas><button class="seg" id="skc" style="width:100%;margin-top:6px">Clear sketch</button>
+ <label>Sound</label><button class="seg" id="rec" style="width:100%">Record 15 seconds of sound</button><p id="rs" class="note"></p>
+ <label style="display:flex;gap:8px;align-items:center;margin-top:10px;color:var(--paper)"><input type="checkbox" id="cap" style="accent-color:#c9a96a"> Leave this note here for future me</label>
+ <div class="row" style="margin:14px 0 0"><button class="go ghost" id="dc" style="flex:1;font-size:18px">Cancel</button><button class="go" id="ds" style="flex:1;font-size:18px">Save</button></div></dialog>
+<dialog id="sd"><h2 style="font-size:26px">Settings</h2>
+ <label style="display:flex;gap:10px;align-items:flex-start;color:var(--paper);margin-top:12px"><input type="checkbox" id="safe" style="margin-top:4px;accent-color:#c9a96a"><span>Safe mode<br><span style="color:var(--dusk);font-size:13px">Keep spots on public roads, paths and park edges. Turn off to allow any point.</span></span></label>
+ <label style="display:flex;gap:10px;align-items:flex-start;color:var(--paper);margin-top:12px"><input type="checkbox" id="fogc" style="margin-top:4px;accent-color:#c9a96a"><span>Fog of war<br><span style="color:var(--dusk);font-size:13px">Dim the map until you visit places. Each saved visit clears a circle.</span></span></label>
+ <label style="display:flex;gap:10px;align-items:flex-start;color:var(--paper);margin-top:12px"><input type="checkbox" id="red" style="margin-top:4px;accent-color:#c9a96a"><span>Night vision<br><span style="color:var(--dusk);font-size:13px">A dim red look that keeps your eyes adjusted for stargazing.</span></span></label>
+ <label style="display:flex;gap:10px;align-items:flex-start;color:var(--paper);margin-top:12px"><input type="checkbox" id="agec" style="margin-top:4px;accent-color:#c9a96a"><span>Aged map look<br><span style="color:var(--dusk);font-size:13px">Tints the map like an old paper atlas.</span></span></label>
+ <label style="display:flex;gap:10px;align-items:flex-start;color:var(--paper);margin-top:12px"><input type="checkbox" id="usc" style="margin-top:4px;accent-color:#c9a96a"><span>U.S. only<br><span style="color:var(--dusk);font-size:13px">Only pick destinations inside the United States.</span></span></label>
+ <label for="ghs" style="margin-top:12px">Ghost map overlay</label><select id="ghs"><option value="">None</option><option value="usgs">USGS topographic (US only)</option><option value="custom">Custom tile URL</option></select>
+ <input type="text" id="ghu" placeholder="https://example.com/{z}/{x}/{y}.png" style="display:none;margin-top:6px">
+ <label for="gho">Overlay strength: <b id="ghov"></b></label><input type="range" id="gho" min="10" max="100">
+ <p class="note">Overlays are drawn over the base map. Pick one that covers where you are, or paste any https tile address with {z}, {x} and {y} in it.</p>
+ <button class="go" id="sx" style="margin-top:16px;font-size:18px">Done</button></dialog>
+<dialog id="skd"><canvas id="sc" width="320" height="320" style="width:100%;max-width:320px;display:block;margin:0 auto"></canvas><p id="sn" style="color:var(--dusk);font-size:13px;margin:10px 0"></p><button class="go" id="skx" style="font-size:18px">Close</button></dialog>
+<dialog id="apd"><canvas id="apc" width="800" height="1100" style="width:100%;border-radius:6px;display:block"></canvas><div class="row" style="margin:10px 0 0"><button class="go ghost" id="apx" style="flex:1;font-size:18px">Close</button><button class="go" id="aps" style="flex:1;font-size:18px">Save image</button></div></dialog>
+<dialog id="cd"><h2 style="font-size:26px">A note from past you</h2><p id="cn" style="white-space:pre-wrap;margin:12px 0"></p><small id="cw" style="color:var(--dusk)"></small><button class="go" id="cx" style="margin-top:14px;font-size:18px">Close</button></dialog>
+<dialog id="cstd"><canvas id="cv" width="320" height="320" style="width:100%;max-width:320px;display:block;margin:0 auto;border-radius:8px"></canvas><p class="note" id="cvn"></p><button class="go" id="cvx" style="margin-top:10px;font-size:18px">Close</button></dialog>
+<div id="pa"><svg viewBox="0 0 100 100" width="200" height="200" style="opacity:.8"><path d="M50 0L54 7H46Z" fill="#c9a96a"/><g id="rs2" style="transform-origin:50px 50px"><circle cx="50" cy="50" r="31" fill="none" stroke="#c9a96a" stroke-opacity=".5" stroke-dasharray="1 3"/><text x="50" y="16" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="#d18a4a">N</text><text x="50" y="92" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="#eadfc4">S</text><text x="90" y="54" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="#eadfc4">E</text><text x="10" y="54" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="#eadfc4">W</text><g id="nd2" style="transform-origin:50px 50px"><path d="M50 21L57 52L50 47L43 52Z" fill="#c9a96a" stroke="#1a1405" stroke-width=".8"/></g></g></svg><p id="td2" style="margin-top:14px;font-size:14px"></p><p style="margin-top:30px;font-size:12px;opacity:.6">Tap anywhere to wake the screen</p></div>
+<dialog id="sl"><h2 style="font-size:26px">A sealed spot</h2><p style="margin:8px 0">Someone sent you a place. It stays hidden until you arrive.</p><p id="sh" class="note"></p><div id="sr" style="display:none;margin-top:10px"></div><button class="go" id="slx" style="margin-top:14px;font-size:18px">Close</button></dialog>
+<div id="sg"><svg viewBox="0 0 100 100" width="220" height="220"><circle cx="50" cy="50" r="42" fill="none" stroke="#c9a96a" stroke-opacity=".4"/><path id="sgp" fill="none" stroke="#c9a96a" stroke-width="1.2" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/></svg></div>
+<div id="ov"><h2>You've arrived.</h2><p>Stop. Notice three things.</p><p id="qd" style="max-width:320px"></p><p id="vs" class="vs" style="max-width:340px"></p><div class="row" style="width:min(88vw,360px)"><button class="go ghost" id="oc" style="flex:1;font-size:18px">Close</button><button class="go" id="ow" style="flex:1;font-size:18px">Write it down</button></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>if(typeof L==="undefined"){window.L=(function(){const p=new Proxy(function(){},{get:(t,k)=>k===Symbol.toPrimitive?()=>0:p,apply:()=>p,construct:()=>p});return p})();window.driftOffline=1}</script>
+<script>
+const $=i=>document.getElementById(i),D=Math.PI/180;
+let origin=null,home=null,dest=null,mode=1;
+const map=L.map('map',{zoomControl:false}).setView([39,-98],4),pins=L.layerGroup().addTo(map);
+const MAP_KEY='';/* optional: paste a CARTO key here to use their dark tiles */
+L.tileLayer(MAP_KEY?'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key='+MAP_KEY:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'+(MAP_KEY?' © CARTO':''),maxZoom:19,className:MAP_KEY?'':'dk'}).addTo(map);
+const hint=document.createElement('div');hint.id='hint';hint.setAttribute('role','status');hint.style.display='none';$('map').appendChild(hint);
+function say(t,keep){hint.textContent=t;hint.style.display='block';clearTimeout(say.t);if(!keep)say.t=setTimeout(()=>{hint.style.display='none'},5000)}
+function needStart(){if(window.driftOffline){say('The map could not load, so places cannot be shown. Journal, sky and settings still work.',1);return}$('m').textContent='Tap the map to set your starting point';say('Tap the map to set your starting point',1)}
+
+function hash(s){let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
+function seeded(a){return()=>{let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
+function offset(o,d,b){const p=o.lat*D,l=o.lon*D,g=d/6371000,p2=Math.asin(Math.sin(p)*Math.cos(g)+Math.cos(p)*Math.sin(g)*Math.cos(b)),l2=l+Math.atan2(Math.sin(b)*Math.sin(g)*Math.cos(p),Math.cos(g)-Math.sin(p)*Math.sin(p2));return{lat:p2/D,lon:((l2/D+540)%360)-180}}
+function dist(a,b){return Math.hypot((b.lon-a.lon)*D*Math.cos((a.lat+b.lat)*D/2),(b.lat-a.lat)*D)*6371000}
+function bearing(a,b){const dl=(b.lon-a.lon)*D;return(Math.atan2(Math.sin(dl)*Math.cos(b.lat*D),Math.cos(a.lat*D)*Math.sin(b.lat*D)-Math.sin(a.lat*D)*Math.cos(b.lat*D)*Math.cos(dl))/D+360)%360}
+const dirs=['north','northeast','east','southeast','south','southwest','west','northwest'];
+const A=['Quiet','Lantern','Hollow','Silver','Wandering','Amber','Still','Moss','Ember','Distant','Thistle','Gentle'],N=['Ridge','Creek','Orchard','Crossing','Meadow','Landing','Hollow','Overlook','Grove','Shore','Clearing','Bend'];
+
+/* sky */
+const jd=t=>t/864e5+2440587.5;
+function sunAlt(t,la,lo){const d=jd(t)-2451545,g=(357.529+.98560028*d)*D,q=280.459+.98564736*d,L=(q+1.915*Math.sin(g)+.02*Math.sin(2*g))*D,e=(23.439-4e-7*d)*D,dec=Math.asin(Math.sin(e)*Math.sin(L)),ra=Math.atan2(Math.cos(e)*Math.sin(L),Math.cos(L)),H=(280.46061837+360.98564736629*d)*D+lo*D-ra;return Math.asin(Math.sin(la*D)*Math.sin(dec)+Math.cos(la*D)*Math.cos(dec)*Math.cos(H))/D}
+function sunEvents(t,la,lo){const o=[];let p=sunAlt(t,la,lo);for(let i=1;i<=288;i++){const tt=t+i*3e5,a=sunAlt(tt,la,lo);if((p<-.83)!=(a<-.83))o.push([a>p?'sunrise':'sunset',tt]);p=a}return o}
+const MI=['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘'],MN=['New moon','Waxing crescent','First quarter','Waxing gibbous','Full moon','Waning gibbous','Last quarter','Waning crescent'];
+function moon(t){const a=((jd(t)-2451550.1)/29.530588853%1+1)%1,i=Math.round(a*8)%8;return MI[i]+' '+MN[i]}
+let tzh=null;const hhmm=(t,lo)=>new Date(t+(tzh??Math.round(lo/15))*36e5).toISOString().slice(11,16);
+let bg='';for(let i=0;i<70;i++){const z=1+(i%5==0);bg+=`radial-gradient(${z}px ${z}px at ${Math.random()*100}% ${Math.random()*100}%,#fff,transparent),`}
+$('stars').style.background=bg.slice(0,-1);
+function paint(){const p=dest||origin;if(!p)return;const t=$('when').value?new Date($('when').value).getTime():Date.now(),a=sunAlt(t,p.lat,p.lon);
+ $('sky').style.background=a>4?'linear-gradient(#1f4a73,#6f9fc2)':a>-6?'linear-gradient(#3a2a5e,#c96a56)':a>-12?'linear-gradient(#141a3d,#4a3a6e)':'linear-gradient(#04060f,#0f1838)';
+ $('stars').style.opacity=Math.max(0,Math.min(1,(2-a)/14));
+ $('m').textContent=(dest?'Over your spot: ':'Over you: ')+moon(t);
+ $('s').textContent=sunEvents(t,p.lat,p.lon).concat(moonEvents(t,p.lat,p.lon)).sort((a,b)=>a[1]-b[1]).map(e=>e[0]+' '+hhmm(e[1],p.lon)).join(', ')+' (local)';$('tsv').textContent=$('when').value?new Date(t).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):'now'}
+
+/* place finding */
+const miles=()=>.5*Math.pow(1000,$('rad').value/100);
+function rl(){const m=miles();$('rl').textContent=(m<10?m.toFixed(1):Math.round(m))+' miles'}
+$('rad').oninput=rl;rl();
+function setOrigin(p,keep){const moved=!!origin;origin=p;pick=0;$('mv').classList.remove('on');hint.style.display='none';capsules(p);season(p);if(home)home.remove();
+ home=L.marker([p.lat,p.lon],{draggable:true,icon:L.divIcon({className:'',html:'<div class="home"></div>',iconSize:[18,18],iconAnchor:[9,9]})}).addTo(map);
+ home.on('dragend',()=>{const g=home.getLatLng();setOrigin({lat:g.lat,lon:g.lng},1)});
+ if(moved&&wid==null){pins.clearLayers();dest=null;$('result').style.display='none'}
+ if(!keep)map.setView([p.lat,p.lon],12);paint();wx(p)}
+let pick=0;
+$('mv').onclick=()=>{pick=!pick;$('mv').classList.toggle('on',!!pick);if(pick)say('Tap the map to move your start, or drag the gold dot',1);else hint.style.display='none'};
+async function findPlace(){const q=$('sq').value.trim();if(!q)return;
+ const xy=q.match(/^(-?\d{1,2}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)$/);if(xy&&Math.abs(xy[1])<=90&&Math.abs(xy[2])<=180){setOrigin({lat:+xy[1],lon:+xy[2]});say('Start moved to those coordinates');return}
+ say('Searching…',1);
+ const r=await arJ('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q='+encodeURIComponent(q),0,8000);
+ if(r&&r[0]){setOrigin({lat:+r[0].lat,lon:+r[0].lon});say('Start moved to '+String(r[0].display_name).split(',').slice(0,2).join(','))}else say('Nothing found for that search.')}
+$('sg2').onclick=findPlace;$('sq').onkeydown=e=>{if(e.key==='Enter')findPlace()};
+if(navigator.geolocation)navigator.geolocation.getCurrentPosition(g=>setOrigin({lat:g.coords.latitude,lon:g.coords.longitude}),needStart,{timeout:10000});
+else needStart();
+map.on('click',e=>{if(!origin||pick)setOrigin({lat:e.latlng.lat,lon:e.latlng.lng})});
+
+/* numbers */
+const EP=['Blank','Threshold','Balance','Chorus','Foundation','Turning','Hearth','Lantern','Ledger','Last Page'];
+const DS=['a clean slate, everything possible','new beginnings, a door opening','balance, two things finding agreement','creativity and company','what holds steady beneath you','change on its way','home, care and return','quiet insight and searching','abundance and the turning of cycles','completion, a chapter closing'];
+const digs=p=>(Math.abs(p.lat).toFixed(5)+Math.abs(p.lon).toFixed(5)).replace(/\./g,'');
+const red=s=>{let n=[...String(s)].reduce((a,c)=>a+ +c,0);while(n>9&&![11,22,33].includes(n))n=[...String(n)].reduce((a,c)=>a+ +c,0);return n};
+const word=s=>red([...s.toLowerCase()].reduce((a,c)=>a+(c>='a'&&c<='z'?c.charCodeAt(0)-96:0),0));
+function numThread(p){const d=digs(p),m=d.match(/(\d)\1{2,}|(\d)(\d)\2\3/);
+ if(m){const k=+m[0][0];return{a:m[0],k,line:`Angel number ${m[0]} is written into the coordinates: ${DS[k]}.`}}
+ const r=red(d),k=r%10;return{a:'',k,line:`The coordinates add up to ${r}: ${DS[k]}.`}}
+const score=(p,iw)=>{const t=numThread(p);return(t.a?2:0)+(iw&&t.k==iw%10?3:0)};
+function best(c,iw,rng){let b=null,s=-1;for(const p of c){const v=score(p,iw)+rng()*.9;if(v>s){s=v;b=p}}return b}
+
+/* U.S. only: quick box test, then confirm the country with a reverse lookup */
+const US_BOX=[[24.4,49.5,-125,-66.9],[51,71.6,-170,-129.9],[18.8,22.4,-160.7,-154.7]];
+const inUS=p=>US_BOX.some(b=>p.lat>=b[0]&&p.lat<=b[1]&&p.lon>=b[2]&&p.lon<=b[3]);
+async function usOK(p){if(!inUS(p))return false;const l=await locate(p);return!!l&&l.cc==='us'}
+function usRand(){const r=Math.random(),b=US_BOX[r<.82?0:r<.93?1:2];return{lat:b[0]+Math.random()*(b[1]-b[0]),lon:b[2]+Math.random()*(b[3]-b[2])}}
+
+/* roads, paths and park edges */
+async function roads(p,r){
+ const f=k=>`way(around:${r},${p.lat},${p.lon})${k};`,
+ q=`[out:json][timeout:15];(${f('["highway"~"^(residential|unclassified|tertiary|secondary|service|track|path|footway|cycleway|bridleway|living_street|pedestrian)$"]["access"!~"^(private|no)$"]["foot"!="no"]')}${f('["leisure"~"^(park|nature_reserve)$"]')});out geom 60;`;
+ try{const j=await ovp(q,8000),o=[];if(!j)return[];
+  for(const e of j.elements)for(const g of e.geometry||[])o.push({lat:g.lat,lon:g.lon,name:(e.tags||{}).name||''});
+  return o.slice(0,4000)}catch(e){return[]}}
+
+/* threads: nearby story, town, numbers */
+async function threads(p){
+ const J=u=>arJ(u,0,8000);
+ const[w,n]=await Promise.all([J(`https://en.wikipedia.org/w/api.php?action=query&generator=geosearch&ggscoord=${p.lat}|${p.lon}&ggsradius=10000&ggslimit=5&prop=extracts&exintro=1&explaintext=1&exsentences=2&exlimit=max&format=json&origin=*`),J(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=14&lat=${p.lat}&lon=${p.lon}`)]);
+ const pg=w&&w.query?Object.values(w.query.pages).sort((a,b)=>a.index-b.index)[0]:null,ad=(n&&n.address)||{};
+ p.town=ad.hamlet||ad.village||ad.suburb||ad.town||ad.city||ad.county||'';if(n&&n.address)p.loc=addr(ad);
+ return{nt:numThread(p),pg}}
+const addr=ad=>({city:String(ad.city||ad.town||ad.village||ad.hamlet||'').trim(),county:String(ad.county||'').replace(/\s+(County|Parish|Borough)$/i,'').trim(),state:String(ad.state||'').trim(),cc:String(ad.country_code||'').toLowerCase()});
+async function locate(p){if(p.loc)return p.loc;
+ const n=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&addressdetails=1&zoom=14&lat=${p.lat}&lon=${p.lon}`,{signal:AbortSignal.timeout?AbortSignal.timeout(8000):undefined}).then(r=>r.json()).catch(()=>null);
+ if(n&&n.address){p.loc=addr(n.address);if(!p.town)p.town=p.loc.city||p.loc.county}return p.loc||null}
+async function clip(d0,box){
+ const y=1880+hash(d0.lat.toFixed(3)+d0.lon.toFixed(3))%75,low=v=>String(v||'').toLowerCase().trim();
+ box.innerHTML='Searching old papers…';
+ const noPapers=()=>{if(d0===dest){const h=document.querySelector('#ar details[data-k="hist"]');if(h&&!h.open)h.open=true}};
+ const L=await locate(d0);if(!box.isConnected)return;
+ const wrap=(h,mh)=>{box.innerHTML=`<div class="clip"><div class="mh">${mh}</div>${h}</div>`;if(/No papers from here|No clippings turned up|Outside the archive|did not respond/.test(h))noPapers()};
+ if(!L||!L.state){wrap(`<article><h3>Location unknown</h3><p>The place lookup did not respond, so the papers could not be matched to this spot. Try again in a moment.</p></article>`,'THE LOCAL GAZETTE');return}
+ const place=cleanT(L.city||d0.town||L.county||L.state),mh=`THE ${esc(place.toUpperCase())} GAZETTE`;
+ if(L.cc!=='us'){wrap(`<article><h3>Outside the archive</h3><p>The Chronicling America archive only holds American newspapers, so there is nothing to show for this spot.</p></article>`,mh);return}
+ const enc=n=>encodeURIComponent(n).replace(/%20/g,'+'),base='https://www.loc.gov/collections/chronicling-america/',st=`location_state=${enc(low(L.state))}`,
+  clean=cleanT,
+  own=n=>n&&n!==L.county&&!/county$/i.test(n),
+  cty=clean(L.city||(own(d0.town)?d0.town:'')),cn=L.county,tries=[];
+ if(cty)tries.push({q:`location_city=${enc(low(cty))}&${st}`,s:cty,k:'city'});
+ if(cn)tries.push({q:`location_county=${enc(low(cn))}&${st}`,s:cn+' County',k:'county'});
+ {const kw=cty||cn;if(kw)tries.push({q:`qs=${enc(kw)}&${st}`,s:L.state,kw,k:'state'})}
+ const url=t=>`${base}?dl=page&searchType=advanced&ops=AND&${t.q}`,
+  has=(v,n)=>{v=[].concat(v||[]);return!v.length||v.some(z=>{z=low(z);return z===n||(z.length>3&&(z.includes(n)||n.includes(z)))})},
+  match=(i,t)=>has(i.location_state,low(L.state))&&(t.k!=='city'||has(i.location_city,low(cty)))&&(t.k!=='county'||has(i.location_county,low(cn)));
+ const ix=await titleIndex(L.state);
+ if(!box.isConnected)return;
+ if(ix.l){
+  const byC=cty?ix.l.filter(r=>r.cities.includes(low(cty))):[],byK=!byC.length&&cn?ix.l.filter(r=>r.counties.includes(low(cn))):[],
+   rank=r=>r.a?(y<r.a?r.a-y:y>(r.b||r.a)?y-(r.b||r.a):0):500,
+   sel=(byC.length?byC:byK).slice().sort((p,q)=>rank(p)-rank(q)).slice(0,3),
+   lab=byC.length?cty:cn+' County',srch=cty||cn,
+   find=srch?`<article><a href="${esc(base+'?dl=page&searchType=advanced&ops=AND&qs='+enc(srch)+'&'+st)}" target="_blank" rel="noopener">Search every ${esc(L.state)} paper for &ldquo;${esc(srch)}&rdquo;</a></article>`:'';
+  if(!sel.length){wrap(`<article><h3>No papers from here</h3><p>The archive has no papers published in ${esc([cty,cn?cn+' County':''].filter(Boolean).join(' or ')||L.state)}. Not every town has papers in it.</p></article>`+find,mh);return}
+  const smp=await Promise.all(sel.map(async r=>{if(!r.lccn)return null;const yy=r.a?Math.min(Math.max(y,r.a),r.b||r.a):y,
+   o=await getJ(`${base}?dl=page&searchType=advanced&fa=number_lccn:${enc(r.lccn)}&start_date=${yy}-01-01&end_date=${yy}-12-31&fo=json&at=results&c=3`);return o.err?null:(o.j.results[0]||null)}));
+  if(!box.isConnected)return;
+  const card=sel.map((r,k)=>{const sm=smp[k],dd=sm?(Array.isArray(sm.description)?sm.description.join(' '):String(sm.description||'')):'',ex=dd.length>240?dd.slice(0,237).trim()+'…':dd,
+   tl=r.t.replace(/\s*\(.*$/,'').trim()||'Newspaper',yrs=r.a?(r.b&&r.b!==r.a?r.a+' to '+r.b:String(r.a)):'',
+   pl=(r.cities[0]||'').replace(/\b\w/g,c=>c.toUpperCase()),lk=r.lccn?`https://www.loc.gov/item/${r.lccn}/`:'',pu=sm?String(sm.url||sm.id||''):'';
+   return`<article><h3>${esc(tl)}</h3><small>${esc([pl,yrs].filter(Boolean).join(', '))}</small>${sm&&sm.date?`<small>Sample page: ${esc(String(sm.date))}</small>`:''}${ex?'<p>'+esc(ex)+'</p>':''}${pu?`<a href="${esc(pu)}" target="_blank" rel="noopener">Read the page</a>`:''}${pu&&lk?' &middot; ':''}${lk?`<a href="${esc(lk)}" target="_blank" rel="noopener">About this paper</a>`:''}</article>`}).join(''),
+   bt=tries.find(t=>t.k===(byC.length?'city':'county'));
+  wrap(`<div class="dl">Papers from ${esc(lab)}</div>${card}`+(bt?`<article><a href="${esc(base+'?dl=title&searchType=advanced&'+bt.q)}" target="_blank" rel="noopener">Browse all papers from ${esc(lab)} on loc.gov</a></article>`:''),mh);return}
+ let got=null,used=null,ok=0,stop=0;const notes=[];
+ if(ix.err)notes.push('Title list: '+ix.err);
+ const run=async list=>{
+  const outs=await Promise.all(list.map(t=>getJ(url(t)+'&fo=json&at=results&c=8')));
+  if(!box.isConnected)return;
+  for(let k=0;k<list.length;k++){const t=list[k],o=outs[k];
+   if(o.err){notes.push(`${t.s}: ${o.err}`);if(o.err==='HTTP 429'||o.err==='HTTP 403')stop=1;continue}
+   ok++;const raw=o.j.results,x=raw.filter(i=>match(i,t));
+   let n=`${t.s}: ${x.length} page${x.length==1?'':'s'}`;
+   if(raw.length&&!x.length){const f=raw[0];n+=` (${raw.length} found elsewhere, such as ${[].concat(f.location_city||[]).concat(f.location_state||[]).join(', ')||'unknown'}; ignored)`}
+   notes.push(n);
+   if(x.length&&!got){got=x;used=t}}};
+ await run(tries.filter(t=>t.k!=='state'));
+ if(!box.isConnected)return;
+ if(!got&&!stop)await run(tries.filter(t=>t.k==='state'));
+ if(!box.isConnected)return;
+ const tail=t=>`<article><a href="${esc(url(t))}" target="_blank" rel="noopener">Browse these papers on loc.gov</a></article>`,
+  det=`<small>Checked: ${esc(notes.join('; '))}</small>`,
+  nm=[...new Set([cty,cn?cn+' County':'',L.state].filter(Boolean))],list=nm.length>1?nm.slice(0,-1).join(', ')+', or '+nm[nm.length-1]:nm[0];
+ if(!got){const t=tries[tries.length-1]||{q:st};
+  wrap((ok?`<article><h3>No clippings turned up</h3><p>Nothing from ${esc(list)} matched in the archive. Not every town has papers in it.</p>${det}</article>`:`<article><h3>The archive did not respond</h3><p>${stop?'The Library of Congress is limiting requests right now. Wait a minute or two and tap the link again.':'The Library of Congress search failed or is busy. Wait a moment and tap the link again.'}</p>${det}</article>`)+tail(t),mh);return}
+ const yr=i=>+String(i.date||'').slice(0,4)||0,pick=got.slice().sort((a,b)=>Math.abs((yr(a)||9999)-y)-Math.abs((yr(b)||9999)-y)).slice(0,4),
+  ys=pick.map(yr).filter(Boolean),span=ys.length?(Math.min(...ys)===Math.max(...ys)?String(ys[0]):Math.min(...ys)+' to '+Math.max(...ys)):'various years',
+  where=used.kw!==undefined?`${used.s}, mentioning ${used.kw}`:used.s,
+  art=pick.map(i=>{const t=String(i.title||'Clipping').split(/\.\s|\(/)[0].trim()||'Clipping',dd=Array.isArray(i.description)?i.description.join(' '):String(i.description||''),ex=dd.length>240?dd.slice(0,237).trim()+'…':dd,l=i.url||i.id||url(used),
+   pl=[].concat(i.location_city||[]).concat(i.location_state||[]).map(z=>String(z).replace(/\b\w/g,c=>c.toUpperCase())).join(', ');
+   return`<article><h3>${esc(t)}</h3>${i.date?'<small>'+esc(String(i.date))+(pl?', '+esc(pl):'')+'</small>':''}${ex?'<p>'+esc(ex)+'</p>':''}<a href="${esc(String(l))}" target="_blank" rel="noopener">Read the page</a></article>`}).join('');
+ wrap(`<div class="dl">Papers from ${esc(where)}, ${span}</div>${art}`+tail(used),mh)}
+/* title index: one cached list of digitized papers per state, matched locally */
+const lw=v=>String(v||'').toLowerCase().trim(),cleanT=n=>String(n||'').replace(/^(town|village|city|township|borough)\s+of\s+/i,'').replace(/\s+(township|borough|town|village|city|cdp)$/i,'').trim(),tiP=new Map();
+const asArr=v=>[].concat(v||[]).map(z=>String(z));
+function normT(i){const t=String(i.title||i.newspaper_title||'').replace(/\s+/g,' ').trim(),m=t.match(/\(([^)]*)\)/),parts=m?m[1].split(',').map(lw):[];
+ let ci=asArr(i.location_city).map(lw),co=asArr(i.location_county).map(z=>lw(z).replace(/\s+county$/,''));
+ if(!ci.length&&parts[0])ci=[parts[0]];
+ if(!co.length&&parts.length>2)co=[parts[1].replace(/\s+county$/,'')];
+ const ys=t.match(/(\d{4})\s*-\s*(\d{4}|\d{3}\?|\d{2}\?\?)?/),a=ys?+ys[1]:0,b=ys&&ys[2]?+ys[2].replace(/\?/g,'9'):a,
+  u=String(i.url||i.id||''),lc=asArr(i.number_lccn)[0]||(u.match(/\b(sn\d{8}|\d{8,10})\b/)||[])[1]||'';
+ return{t,cities:ci,counties:co,lccn:lc,a,b}}
+async function loadTitles(k){
+ const ck='drift.titles.v1.'+k,ek=encodeURIComponent(k).replace(/%20/g,'+'),root='https://www.loc.gov/collections/chronicling-america/';
+ try{const c=JSON.parse(localStorage.getItem(ck)||'null');if(c&&Date.now()-c.t<2592e6&&Array.isArray(c.l)&&c.l.length)return{l:c.l}}catch(e){}
+ const forms=[`${root}dynamic-list-of-titles/?dl=title&location_state=${ek}&searchType=advanced&sb=title_s_asc&st=table&c=150`,`${root}?dl=title&location_state=${ek}&searchType=advanced&c=150`];
+ let raw=[],why=[];
+ for(const f of forms){
+  raw=[];
+  for(let sp=1;sp<=8;sp++){
+   const o=await getJ(`${f}&sp=${sp}&fo=json&at=results`);
+   if(o.err){why.push(o.err);break}
+   raw=raw.concat(o.j.results);if(o.j.results.length<150)break}
+  if(!raw.length)continue;
+  const l=raw.map(normT).filter(r=>r.t&&(r.lccn||r.cities.length));
+  if(l.length&&l.filter(r=>r.cities.length).length>=l.length*.5){
+   try{localStorage.setItem(ck,JSON.stringify({t:Date.now(),l}))}catch(e){}
+   return{l}}
+  why.push('unrecognised fields: '+Object.keys(raw[0]||{}).slice(0,14).join('/'))}
+ return{err:why.join(' | ')||'no titles found'}}
+function titleIndex(state){const k=lw(state);if(!k)return Promise.resolve({err:'no state'});
+ if(!tiP.has(k))tiP.set(k,loadTitles(k).then(o=>{if(o.err)tiP.delete(k);return o}));return tiP.get(k)}
+
+const jc=new Map();
+async function getJ(u){if(jc.has(u))return jc.get(u);let o;
+ for(let a=0;a<2;a++){
+  try{const r=await fetch(u,{signal:AbortSignal.timeout?AbortSignal.timeout(a?20000:12000):undefined});o=r.ok?{j:await r.json()}:{err:'HTTP '+r.status}}catch(e){o={err:e&&e.name==='TimeoutError'?'timed out':'blocked or offline'}}
+  if(!o.err||o.err==='HTTP 429'||o.err==='HTTP 403'||o.err==='blocked or offline')break;
+  await new Promise(r=>setTimeout(r,800))}
+ if(!o.err&&!(o.j&&Array.isArray(o.j.results)))o={err:'unexpected reply'};if(!o.err)jc.set(u,o);return o}
+
+let nb=null;
+async function nearClip(t,box){const L=await locate(t);if(!box.isConnected)return;if(L)t.loc=Object.assign({},L,{city:t.town});await clip(t,box)}
+async function nearTowns(p){
+ const pts=[{lat:p.lat,lon:p.lon}];for(let i=0;i<8;i++)pts.push(offset(p,16000,i*45*D));
+ const rs=await Promise.all(pts.map(q=>fetch(`https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${q.lat}|${q.lon}&gsradius=10000&gslimit=50&gsprop=type&format=json&origin=*`,{signal:AbortSignal.timeout?AbortSignal.timeout(10000):undefined}).then(r=>r.json()).catch(()=>null))),
+  own=p.loc&&p.loc.city?p.loc.city.toLowerCase():'',seen=new Map();let any=0;
+ for(const r of rs){if(!r||!r.query||!r.query.geosearch)continue;any=1;
+  for(const g of r.query.geosearch){const t=String(g.title||''),name=t.split(',')[0].replace(/\s*\(.*\)$/,'').trim(),k=name.toLowerCase();
+   const town=g.type==='city'||(!g.type&&/^[^,()]+, [^,()]+$/.test(t));
+   if(!town||!name||k===own||/county$/i.test(name)||seen.has(k)||dist(p,{lat:g.lat,lon:g.lon})<800)continue;
+   seen.set(k,{lat:g.lat,lon:g.lon,town:name,st:lw(t.split(',')[1]||'').replace(/\(.*\)/,'').trim()})}}
+ const all=[...seen.values()].sort((a,b)=>dist(p,a)-dist(p,b));return{any,T:all.slice(0,8),P:all.slice(0,24)}}
+async function nearby(){
+ const p=dest,st=m=>{const n=$('nbm');if(n&&dest===p)n.innerHTML=m};
+ st('<p class="note">Looking for nearby towns…</p>');
+ let{any,T,P}=await nearTowns(p);
+ if(dest!==p)return;
+ let withPapers=0,none=0;const sL=p.loc&&p.loc.cc==='us'?p.loc.state:'';
+ if(sL){const ix=await titleIndex(sL);if(dest!==p)return;
+  if(ix.l){const has=new Set(ix.l.flatMap(r=>r.cities)),w=P.filter(t=>t.st===lw(sL)&&has.has(lw(cleanT(t.town))));if(w.length){T=w.slice(0,8);withPapers=1}else none=1}
+  for(const t of T)if(t.st===lw(sL))t.loc={city:t.town,county:'',state:sL,cc:'us'}}
+
+ if(nb){nb.remove();nb=null}
+ if(!T.length){st(`<p class="note">${any?'No other towns found close by.':'Could not load nearby towns right now.'} <a href="#" id="nbr">Try again</a></p>`);const r=$('nbr');if(r)r.onclick=e=>{e.preventDefault();nearby()};return}
+ nb=L.layerGroup().addTo(pins);
+ for(const t of T){const m=L.marker([t.lat,t.lon],{icon:L.divIcon({className:'',html:'<div class="nbp">📰</div>',iconSize:[26,26],iconAnchor:[13,13]}),title:t.town,zIndexOffset:500}).addTo(nb);
+  m.bindTooltip(t.town);
+  let bx=null,run=0;m.bindPopup(()=>{if(!bx){bx=document.createElement('div');bx.textContent='Searching old papers…'}
+   if(!run){run=1;nearClip(t,bx).catch(()=>{bx.textContent='That search failed. Close and tap the marker again.'}).then(()=>{run=bx.querySelector('.clip')?2:0;const pp=m.getPopup();if(run==2&&pp&&pp.isOpen())pp.update()})}
+   return bx},{maxWidth:300,maxHeight:340})}
+ map.fitBounds(L.latLngBounds([[p.lat,p.lon]].concat(T.map(t=>[t.lat,t.lon]))).pad(.15),{maxZoom:12});
+ st(`<p class="note">${withPapers?T.length+(T.length==1?' nearby town with digitized papers is':' nearby towns with digitized papers are')+' marked 📰 on the map. Tap one to read its papers.':(none?'None of the nearest towns have papers in the archive, so these are just the closest towns. ':'')+T.length+(T.length==1?' nearby town is':' nearby towns are')+' marked 📰 on the map.'}</p>`)}
+function setMode(m){mode=m;$('m1').classList.toggle('on',m==1);$('m2').classList.toggle('on',m==2);$('m3').classList.toggle('on',m==3);$('intent').style.display=m==2?'block':'none'}
+$('m1').onclick=()=>setMode(1);$('m2').onclick=()=>setMode(2);$('m3').onclick=()=>setMode(3);$('when').onchange=paint;
+
+
+async function spawn(){
+ if(!origin){needStart();return}
+ const txt=$('intent').value.trim();if(mode==2&&!txt){$('intent').focus();return}
+ $('go').disabled=true;$('go').textContent='Searching';const hold=sigil(mode==2?txt:String(Date.now()));$('rmap').style.display='';$('walk').style.display='';
+ const rng=mode==2?seeded(hash(txt+Date.now())):Math.random,Rm=miles()*1609.34,iw=mode==2?word(txt):0;let hit=null,raw;dkP=null;
+ if(mode==3)hit=await dreamPoint();
+ let rawOK=null;
+ for(let i=0;i<(cfg.us?8:3)&&!hit&&mode!=3;i++){
+  raw=kind==4?await darkRaw(origin,Rm,rng):pickRaw(origin,Rm,rng);
+  if(cfg.safe){const sr=Math.min(5000,Math.max(500,Rm*.3)),c=(await roads(raw,sr)).filter(v=>dist(raw,v)<sr*1.2);if(c.length)hit=kind==4&&dkP&&dkP.length?c.reduce((a,b)=>dkVal(b)>dkVal(a)?b:a):best(c,iw,rng)}
+  else hit=kind==4?raw:best(Array.from({length:300},()=>offset(raw,rng()*1500,rng()*6.2832)),iw,rng);
+  if(cfg.us){if(await usOK(hit||raw)){if(!hit)rawOK=raw}else hit=null}}
+ if(cfg.us&&!hit&&!rawOK){say('No U.S. spot found in that radius. Try a bigger radius, move your start, or turn off U.S. only in Settings.');return}
+ dest=hit||rawOK||raw;dest.road=!!hit&&cfg.safe;arr=0;
+ const T=await threads(dest),k=T.nt.k,place=T.pg?T.pg.title:(dest.name||dest.town);
+ dest.title=EP[k]+(place?' near '+place:' '+(T.nt.a||k));
+ const d=dist(origin,dest),b=bearing(origin,dest),ao=dest.lon>0?dest.lon-180:dest.lon+180;
+ await hold;$('sg').style.display='none';
+ pins.clearLayers();
+ const ring=L.circle([origin.lat,origin.lon],{radius:Rm,color:'#c9a96a',weight:1,fillOpacity:.03,dashArray:'2 6'});if(mode!=3)ring.addTo(pins);
+ L.polyline([[origin.lat,origin.lon],[dest.lat,dest.lon]],{color:'#c9a96a',weight:1.5,dashArray:'4 6'}).addTo(pins);
+ L.marker([dest.lat,dest.lon],{icon:L.divIcon({className:'',html:'<div class="star'+(T.nt.a&&T.pg&&(!iw||T.nt.k==iw%10)?' gold':'')+'">✦</div>',iconSize:[28,28],iconAnchor:[14,14]})}).addTo(pins);
+ if(mode==3)map.setView([dest.lat,dest.lon],7);else map.fitBounds(ring.getBounds());
+ $('rn').textContent=dest.title;
+ $('rd').textContent=(d/1609.34).toFixed(d<16093?1:0)+' miles '+dirs[Math.round(b/45)%8]+(cfg.safe?(dest.road?', on a public road, path or park edge':'. No public road or path found nearby, so check access before going.'):'. Safe mode is off, so check access before going.');
+ $('th').innerHTML=`<p>${iw?`Your words add up to ${iw}. `:''}${esc(T.nt.line)}</p>`+(T.pg?`<p><b>A story from nearby:</b> ${esc(T.pg.extract||T.pg.title)} <a href="https://en.wikipedia.org/?curid=${T.pg.pageid}" target="_blank" rel="noopener">Wikipedia</a></p>`:'')+`<p>Straight through the Earth: <a href="https://www.openstreetmap.org/?mlat=${-dest.lat}&mlon=${ao}#map=4/${-dest.lat}/${ao}" target="_blank" rel="noopener">the other side</a></p><div id="ar"></div>`;
+ try{arAround(dest)}catch(e){}if(mode!=3){if(kind==4)darkNote();goldenLine(d)}
+ if(T.nt.a&&T.pg&&(!iw||T.nt.k==iw%10))$('th').insertAdjacentHTML('afterbegin','<p><b>Alignment.</b> '+(iw?'Your words, ':'')+'an angel number and a local story all line up here.</p>');
+ $('rmap').href=`https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lon}`;
+ if(mode==3){$('rd').textContent='An armchair visit, no travel needed. It is '+Math.round(d/1609.34).toLocaleString()+' miles from you.';$('rmap').style.display='none';$('walk').style.display='none'}
+ $('result').style.display='block';paint();wx(dest);
+ $('go').disabled=false;$('go').textContent='Find another'}
+$('go').onclick=async()=>{try{await spawn()}catch(e){say('Something went wrong: '+(e&&e.message||e))}finally{$('sg').style.display='none';$('go').disabled=false;if($('go').textContent==='Searching')$('go').textContent='Find a place'}};
+$('loc').onclick=()=>navigator.geolocation?navigator.geolocation.getCurrentPosition(g=>setOrigin({lat:g.coords.latitude,lon:g.coords.longitude}),needStart,{timeout:10000}):needStart();
+
+/* journal */
+const load=()=>{try{return JSON.parse(localStorage.drift||'[]')}catch(e){return[]}};
+function save(a){try{localStorage.drift=JSON.stringify(a);return true}catch(e){return false}}
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function renderJ0(){const a=load();$('journal').innerHTML=a.length?a.map(e=>`<div class="entry"><h2>${esc(e.name)}</h2><small>${new Date(e.t).toLocaleDateString()}, ${e.moon}</small>${e.sky?`<small>${esc(e.sky)}</small>`:''}${e.lat!=null?`<small>${e.lat.toFixed(4)}, ${e.lon.toFixed(4)}</small>`:''}${e.pic?`<div class="ph"><img alt="" src="${e.pic}"></div>`:''}<p>${esc(e.note)}</p>${e.snd?`<audio controls src="${e.snd}" style="width:100%"></audio>`:''}${e.sk?`<img alt="" src="${e.sk}" style="border:0;box-shadow:none;background:#1a2147;margin:6px 0">`:''}${e.item?'<small>Collected: '+ico(e.item)+' '+esc(e.item)+'</small>':''}${(e.finds||[]).map(f=>`<small><b>${esc(f.k)}:</b> ${esc(f.t)}</small>`).join('')}${e.cap?'<small>Time capsule</small>':''}<small><a href="#" data-d="${e.id}">Delete</a></small></div>`).reverse().join(''):'<p style="color:var(--dusk);text-align:center;margin-top:40px">Your journal is empty.<br>Find a place and mark it as visited.</p>'}
+$('journal').onclick=e=>{const id=e.target.dataset&&e.target.dataset.d;if(id){e.preventDefault();if(confirm('Delete this entry?')){save(load().filter(x=>String(x.id)!==id));renderJ()}}};
+function shrink(f){return new Promise(r=>{const i=new Image(),u=URL.createObjectURL(f);i.onerror=()=>{URL.revokeObjectURL(u);r('')};i.onload=()=>{URL.revokeObjectURL(u);const s=Math.min(1,700/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=i.width*s;c.height=i.height*s;c.getContext('2d').drawImage(i,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',.7))};i.src=u})}
+function tab(n){for(let i=1;i<4;i++)$('t'+i).classList.toggle('on',n==i);for(const i of['map','panel'])$(i).style.display=n==1?'':'none';$('around').style.display=n==3?'block':'none';$('journal').style.display=n==2?'block':'none';if(n==1){fog();setTimeout(()=>map.invalidateSize(),50)}else if(n==2)renderJ()}
+$('t1').onclick=()=>tab(1);$('t2').onclick=()=>tab(2);$('t3').onclick=()=>tab(3);$('goAr').onclick=()=>tab(3);
+/* bottom sheet and interactive sky */
+function sheet(u){$('panel').classList.toggle('up',u);$('gt').textContent=u?'Options ▾':'Options ▴';setTimeout(()=>map.invalidateSize(),60)}
+let gy=null;$('grab').onpointerdown=e=>{gy=e.clientY;try{$('grab').setPointerCapture(e.pointerId)}catch(x){}};
+$('grab').onpointerup=e=>{const dy=gy==null?0:e.clientY-gy;gy=null;sheet(dy<-25?true:dy>25?false:!$('panel').classList.contains('up'))};
+$('sky').onclick=e=>{if(e.target.closest('button,input,a,label'))return;$('sky').classList.toggle('open');setTimeout(()=>map.invalidateSize(),60)};
+const p2=n=>String(n).padStart(2,'0');
+$('tsl').oninput=()=>{const v=+$('tsl').value;if(!v)$('when').value='';else{const d=new Date(Date.now()+v*9e5);$('when').value=d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())+'T'+p2(d.getHours())+':'+p2(d.getMinutes())}paint()};
+$('tnow').onclick=()=>{$('tsl').value=0;$('tsl').oninput()};
+$('arr').onclick=()=>{$('dn').textContent=dest.title;$('dv').innerHTML=skipV?'':verse(dest);$('note').value='';$('pic').value='';recData='';$('rs').textContent='';skx.clearRect(0,0,320,180);skd=0;$('item').value='';$('mb').value=3;$('ma').value=3;$('mbv').textContent=3;$('mav').textContent=3;$('cap').checked=false;const o=load().filter(e=>e.pic&&e.lat!=null&&!e.sync&&dist(e,dest)<200).pop();$('rv').innerHTML=o?`<img alt="" src="${o.pic}" style="width:100%;opacity:.5;border-radius:6px;margin-top:8px"><p class="note">You were here before. Try to frame this photo the same way.</p>`:'';$('dlg').showModal()};
+$('dc').onclick=()=>$('dlg').close();
+$('ds').onclick=async()=>{const f=$('pic').files[0],e={id:Date.now(),t:Date.now(),name:dest.title,lat:dest.lat,lon:dest.lon,moon:moon(Date.now()),sky:overhead(Date.now(),dest.lat,dest.lon),note:$('note').value,item:$('item').value.trim(),mb:+$('mb').value,ma:+$('ma').value,mi:origin?dist(origin,dest)/1609.34:0,snd:recData,sk:skd?$('sk').toDataURL('image/png'):'',cap:$('cap').checked?1:0,finds:Object.entries(dest.finds||{}).map(([k,t])=>({k,t})),pic:f?await shrink(f):''},a=load();a.push(e);
+ if(!save(a)){e.pic='';e.snd='';e.sk='';alert(save(a)?'Storage is full, so the photo and sound were left out.':'Could not save this entry.')}
+ $('dlg').close();tab(2)};
+
+/* settings */
+const cfg=(()=>{try{return Object.assign({safe:true,fog:true},JSON.parse(localStorage.driftcfg||'{}'))}catch(e){return{safe:true,fog:true}}})();
+$('safe').checked=cfg.safe;
+$('safe').onchange=()=>{cfg.safe=$('safe').checked;sv()};
+$('usc').checked=!!cfg.us;$('usc').onchange=()=>{cfg.us=$('usc').checked;sv()};
+$('gear').onclick=()=>$('sd').showModal();$('sx').onclick=()=>$('sd').close();
+
+/* weather and local time */
+async function wx(p){aurora(p);tide(p);try{const j=await(await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&current=temperature_2m,weather_code&temperature_unit=fahrenheit&timezone=auto`)).json(),c=j.current.weather_code;if(p!==(dest||origin))return;
+ tzh=j.utc_offset_seconds/3600;$('w').textContent=(c==0?'Clear':c<4?'Partly cloudy':c<50?'Fog':c<68?'Rain':c<78?'Snow':c<83?'Showers':c<87?'Snow showers':'Thunderstorms')+', '+Math.round(j.current.temperature_2m)+'°F';
+ $('sky').classList.toggle('rain',(c>=51&&c<=67)||(c>=80&&c<=82)||c>=95);paint()}catch(e){}}
+
+/* fog of war: places you have visited clear a circle on the map */
+let fogL=null,dragL=null;
+function fog(){if(fogL){fogL.remove();fogL=null}if(dragL){dragL.remove();dragL=null}if(!cfg.fog)return;const h=load().filter(e=>e.lat!=null&&!e.sync).map(e=>Array.from({length:32},(_,i)=>{const q=offset(e,2000,i/32*6.2832);return[q.lat,q.lon]}));
+ fogL=L.polygon([[[-85,-180],[-85,180],[85,180],[85,-180]],...h],{stroke:false,fillColor:'#0a0e1f',fillOpacity:.55,interactive:false}).addTo(map);fogL.bringToBack();flourish()}
+fog();
+
+/* walking: compass, distance in words, arrival moment, number-driven side quests */
+let wid=null,hd=null,arr=0,lastB=0,lstn=0;
+const QUEST=['Stand still for one full minute and watch what moves.','Look at the first thing that catches your eye for a full minute.','Find a pair of things that match, or almost match.','Listen for three different sounds.','Find something that has stood here a long time.','Walk five steps in a direction you did not plan, then stop.','Find something that feels like home or reminds you of someone.','Find seven of something.','Find a loop, a circle or a cycle.','Look back the way you came and notice what you passed.'];
+const aim=()=>{for(const[r,n]of[['rs1','nd'],['rs2','nd2']]){$(r).style.transform=`rotate(${-(hd||0)}deg)`;$(n).style.transform=`rotate(${lastB}deg)`}};
+function arrive(){if(arr)return;arr=1;if(navigator.vibrate)navigator.vibrate([200,100,200]);$('qd').textContent=QUEST[numThread(dest).k];$('vs').innerHTML=verse(dest);$('ov').style.display='flex'}
+async function trip(){
+ if(wid!=null){navigator.geolocation.clearWatch(wid);wid=null;$('tr').style.display='none';$('walk').textContent='Start journey';return}
+ try{if(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission)await DeviceOrientationEvent.requestPermission()}catch(e){}
+ if(!lstn){lstn=1;addEventListener('deviceorientationabsolute',o=>{if(o.alpha!=null){hd=360-o.alpha;aim()}},true);addEventListener('deviceorientation',o=>{if(o.webkitCompassHeading!=null){hd=o.webkitCompassHeading;aim()}},true)}
+ arr=0;$('tr').style.display='block';$('walk').textContent='Stop journey';$('td').textContent='Waiting for your location';
+ wid=navigator.geolocation.watchPosition(g=>{const me={lat:g.coords.latitude,lon:g.coords.longitude},d=dist(me,dest);lastB=bearing(me,dest);aim();
+  $('td').textContent=$('td2').textContent=(d<500?Math.round(d*3.281)+' feet':(d/1609.34).toFixed(1)+' miles')+' away, about '+Math.max(1,Math.round(d/1609.34/SPD[tm]*60))+' minutes '+TW[tm];
+  if(d<60)arrive()},()=>{$('td').textContent='Location unavailable'},{enableHighAccuracy:true})}
+$('walk').onclick=trip;$('oc').onclick=()=>{$('ov').style.display='none'};$('ow').onclick=()=>{$('ov').style.display='none';skipV=1;$('arr').click();skipV=0};
+
+/* journal tools */
+function exportJ(){const u=URL.createObjectURL(new Blob([JSON.stringify(load())],{type:'application/json'})),l=document.createElement('a');l.href=u;l.download='drift-journal-'+new Date().toISOString().slice(0,10)+'.json';l.click();setTimeout(()=>URL.revokeObjectURL(u),4000)}
+async function importJ(){const f=$('imf').files[0];if(!f)return;try{const a=JSON.parse(await f.text());if(!Array.isArray(a))throw 0;const cur=load(),ids=new Set(cur.map(e=>String(e.id))),add=a.filter(e=>e&&e.id!=null&&!ids.has(String(e.id)));if(!save(cur.concat(add)))alert('Storage is full, so nothing was imported.');else alert(add.length+' entries added.');renderJ()}catch(e){alert('That file is not a Drift journal.')}}
+function renderJ(){renderJ0();$('journal').insertAdjacentHTML('afterbegin','<div class="row"><button class="seg" id="lg">Log a coincidence</button><button class="seg" id="pr">Print journal</button><button class="seg" id="cs">Your stars</button><button class="seg" id="ap">Atlas poster</button></div><div class="row"><button class="seg" id="ex">Export journal</button><button class="seg" id="im">Import journal</button><input type="file" id="imf" accept="application/json,.json" style="display:none"></div>'+logbook());
+ $('lg').onclick=()=>{const n=prompt('What happened?');if(!n)return;const a=load();a.push({id:Date.now(),t:Date.now(),name:'A coincidence',sync:1,lat:dest?dest.lat:null,lon:dest?dest.lon:null,moon:moon(Date.now()),note:n,pic:''});save(a);renderJ()};
+ $('pr').onclick=()=>print();$('cs').onclick=()=>{$('cstd').showModal();stars()};$('ap').onclick=poster;$('ex').onclick=exportJ;$('im').onclick=()=>$('imf').click();$('imf').onchange=importJ}
+$('red').checked=!!cfg.red;document.body.classList.toggle('red',!!cfg.red);
+$('red').onchange=()=>{cfg.red=$('red').checked;document.body.classList.toggle('red',cfg.red);sv()};
+
+/* sky map: constellations, sun and moon */
+const CON=[['Orion',[[5.92,7.41],[5.24,-8.2],[5.42,6.35],[5.53,-.3],[5.6,-1.2],[5.68,-1.94],[5.8,-9.67]],[[0,2],[2,3],[3,4],[4,5],[0,5],[5,6],[3,1],[1,6]]],
+['Big Dipper',[[11.06,61.75],[11.03,56.38],[11.9,53.69],[12.26,57.03],[12.9,55.96],[13.4,54.93],[13.79,49.31]],[[0,1],[1,2],[2,3],[3,0],[3,4],[4,5],[5,6]]],
+['Cassiopeia',[[.15,59.15],[.68,56.54],[.95,60.72],[1.43,60.24],[1.91,63.67]],[[0,1],[1,2],[2,3],[3,4]]],
+['Cygnus',[[20.69,45.28],[20.37,40.26],[19.51,27.96],[20.77,33.97],[19.75,45.13]],[[0,1],[1,2],[4,1],[1,3]]],
+['Lyra',[[18.62,38.78],[18.75,37.6],[18.91,36.9],[18.98,32.69],[18.84,33.36]],[[0,1],[1,2],[2,3],[3,4],[4,1]]],
+['Scorpius',[[16.09,-19.81],[16,-22.62],[16.35,-25.59],[16.49,-26.43],[16.6,-28.22],[16.84,-34.29],[16.86,-38.05],[17.51,-37.3],[17.56,-37.1]],[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8]]],
+['Leo',[[10.14,11.97],[10.12,16.76],[10.33,19.84],[10.28,23.42],[9.88,26.01],[11.24,20.52],[11.82,14.57],[11.24,15.43]],[[0,1],[1,2],[2,3],[3,4],[2,5],[5,6],[6,7],[7,0]]],
+['Taurus',[[4.6,16.51],[5.44,28.61],[5.63,21.14],[4.33,15.63],[4.48,15.87]],[[3,4],[4,0],[0,2],[0,1]]],
+['Gemini',[[7.58,31.89],[7.76,28.03],[6.63,16.4],[6.73,25.13],[6.38,22.51]],[[0,3],[3,4],[1,2]]],
+['Southern Cross',[[12.44,-63.1],[12.8,-59.69],[12.52,-57.11],[12.25,-58.75]],[[0,2],[1,3]]],
+['Canis Major',[[6.75,-16.72],[6.38,-17.96],[6.98,-28.97],[7.14,-26.39],[7.4,-29.3]],[[0,1],[0,3],[3,2],[3,4]]],
+['Aquila',[[19.77,10.61],[19.85,8.87],[19.92,6.41]],[[0,1],[1,2]]],
+['Pegasus',[[23.08,15.21],[23.06,28.08],[.14,29.09],[.22,15.18]],[[0,1],[1,2],[2,3],[3,0]]],
+['Bootes',[[14.26,19.18],[14.75,27.07],[15.03,40.39],[14.53,38.31],[13.91,18.4]],[[4,0],[0,1],[1,3],[3,2]]],
+['Little Dipper',[[2.53,89.26],[17.54,86.59],[16.77,82.04],[15.73,77.79],[16.29,75.76],[15.35,71.83],[14.84,74.16]],[[0,1],[1,2],[2,3],[3,4],[4,5],[5,6],[6,3]]],
+['Andromeda',[[.14,29.09],[.66,30.86],[1.16,35.62],[2.06,42.33]],[[0,1],[1,2],[2,3]]],
+['Perseus',[[3.08,53.51],[3.41,49.86],[3.72,47.79],[3.96,40.01],[3.9,31.88],[3.14,40.96]],[[0,1],[1,2],[2,3],[3,4],[1,5]]],
+['Sagittarius',[[18.4,-34.38],[18.35,-29.83],[18.47,-25.42],[18.92,-26.3],[19.04,-29.88],[18.76,-26.99],[19.12,-27.67],[18.1,-30.42]],[[7,1],[1,2],[2,5],[5,3],[3,6],[6,4],[4,0],[0,1]]]];
+function altaz(t,la,lo,ra,dec){const H=(280.46061837+360.98564736629*(jd(t)-2451545))*D+lo*D-ra*15*D,sd=Math.sin(dec*D),cd=Math.cos(dec*D),sl=Math.sin(la*D),cl=Math.cos(la*D);
+ return{alt:Math.asin(sl*sd+cl*cd*Math.cos(H))/D,az:(Math.atan2(-cd*Math.sin(H),sd*cl-cd*sl*Math.cos(H))/D+360)%360}}
+function sunRD(t){const d=jd(t)-2451545,g=(357.529+.98560028*d)*D,L=(280.459+.98564736*d+1.915*Math.sin(g)+.02*Math.sin(2*g))*D,e=(23.439-4e-7*d)*D;return{ra:(Math.atan2(Math.cos(e)*Math.sin(L),Math.cos(L))/D/15+24)%24,dec:Math.asin(Math.sin(e)*Math.sin(L))/D}}
+function moonRD(t){const d=jd(t)-2451545,l=(218.316+13.176396*d)*D+6.289*D*Math.sin((134.963+13.064993*d)*D),b=5.128*D*Math.sin((93.272+13.22935*d)*D),e=(23.439-4e-7*d)*D;
+ return{ra:(Math.atan2(Math.sin(l)*Math.cos(e)-Math.tan(b)*Math.sin(e),Math.cos(l))/D/15+24)%24,dec:Math.asin(Math.sin(b)*Math.cos(e)+Math.cos(b)*Math.sin(e)*Math.sin(l))/D}}
+function overhead(t,la,lo){const s=sunRD(t);if(altaz(t,la,lo,s.ra,s.dec).alt>-6)return'Daytime sky';
+ const o=CON.map(([n,st])=>[n,Math.max(...st.map(q=>altaz(t,la,lo,q[0],q[1]).alt))]).filter(a=>a[1]>25).sort((a,b)=>b[1]-a[1]).slice(0,3).map(a=>a[0]);return o.length?'Overhead: '+o.join(', '):'Only low stars'}
+function skyMap(){const p=dest||origin;if(!p)return;const t=$('when').value?new Date($('when').value).getTime():Date.now(),x=$('sc').getContext('2d'),W=320,R=146,xy=a=>{const r=R*(90-a.alt)/90;return[W/2-r*Math.sin(a.az*D),W/2-r*Math.cos(a.az*D)]},
+ su=sunRD(t),mo=moonRD(t),S=altaz(t,p.lat,p.lon,su.ra,su.dec),M=altaz(t,p.lat,p.lon,mo.ra,mo.dec);
+ x.clearRect(0,0,W,W);x.fillStyle=S.alt>0?'#2a5a85':S.alt>-12?'#141a3d':'#04060f';x.beginPath();x.arc(W/2,W/2,R,0,7);x.fill();x.strokeStyle='#c9a96a';x.lineWidth=1;x.stroke();
+ x.font='15px "IM Fell English",Georgia,serif';x.textAlign='center';x.fillStyle='#c9a96a';
+ [['N',0],['E',90],['S',180],['W',270]].forEach(([l,az])=>{const q=xy({alt:-9,az});x.fillText(l,q[0],q[1]+5)});
+ for(const[n,st,ln]of CON){const P=st.map(q=>altaz(t,p.lat,p.lon,q[0],q[1]));x.strokeStyle='#c9a96a99';x.beginPath();
+  for(const[i,j]of ln)if(P[i].alt>0&&P[j].alt>0){const a=xy(P[i]),b=xy(P[j]);x.moveTo(a[0],a[1]);x.lineTo(b[0],b[1])}x.stroke();
+  x.fillStyle='#fff';P.forEach(q=>{if(q.alt>0){const c=xy(q);x.beginPath();x.arc(c[0],c[1],2,0,7);x.fill()}});
+  const v=P.find(q=>q.alt>12);if(v){const c=xy(v);x.fillStyle='#c9a96a';x.fillText(n,c[0],c[1]-8)}}
+ if(S.alt>0){const c=xy(S);x.fillStyle='#ffd86b';x.beginPath();x.arc(c[0],c[1],7,0,7);x.fill()}
+ if(M.alt>0){const c=xy(M);x.fillStyle='#eadfc4';x.beginPath();x.arc(c[0],c[1],6,0,7);x.fill()}
+ const up=[];planetsRD(t).forEach(q=>{const A=altaz(t,p.lat,p.lon,q.ra,q.dec);if(A.alt>0){const c=xy(A);x.fillStyle='#f0a6a0';x.beginPath();x.arc(c[0],c[1],3.5,0,7);x.fill();x.fillText(q.n,c[0],c[1]-8);if(A.alt>5)up.push(q.n)}});
+ $('sn').textContent=moon(t)+'. '+overhead(t,p.lat,p.lon)+'.'+(up.length?' Planets up: '+up.join(', ')+'.':'')+' The sky is shown looking up, with north at the top.'}
+$('skybtn').onclick=()=>{if(!(dest||origin))return;$('skd').showModal();skyMap()};$('skx').onclick=()=>$('skd').close();
+$('fogc').checked=cfg.fog!==false;$('fogc').onchange=()=>{cfg.fog=$('fogc').checked;try{localStorage.driftcfg=JSON.stringify(cfg)}catch(e){}fog()};
+
+/* planets (approximate orbital elements) */
+const PL=[['Mercury',[.38709927,.00000037,.20563593,.00001906,7.00497902,-.00594749,252.2503235,149472.67411175,77.45779628,.16047689,48.33076593,-.12534081]],
+['Venus',[.72333566,.0000039,.00677672,-.00004107,3.39467605,-.0007889,181.9790995,58517.81538729,131.60246718,.00268329,76.67984255,-.27769418]],
+['Mars',[1.52371034,.00001847,.0933941,.00007882,1.84969142,-.00813131,-4.55343205,19140.30268499,-23.94362959,.44441088,49.55953891,-.29257343]],
+['Jupiter',[5.202887,-.00011607,.04838624,-.00013253,1.30439695,-.00183714,34.39644051,3034.74612775,14.72847983,.21252668,100.47390909,.20469106]],
+['Saturn',[9.53667594,-.0012506,.05386179,-.00050991,2.48599187,.00193609,49.95424423,1222.49362201,92.59887831,-.41897216,113.66242448,-.28867794]]];
+const EM=[1.00000261,.00000562,.01671123,-.00004392,-.00001531,-.01294668,100.46457166,35999.37244981,102.93768193,.32327364,0,0];
+function helio(el,T){const[a,a1,e,e1,I,I1,L,L1,w,w1,O,O1]=el,A=a+a1*T,ee=e+e1*T,i=(I+I1*T)*D,P=w+w1*T,Om=(O+O1*T)*D,m=((((L+L1*T)-P)%360)+540)%360-180,mr=m*D;
+ let E=mr+ee*Math.sin(mr);for(let k=0;k<6;k++)E-=(E-ee*Math.sin(E)-mr)/(1-ee*Math.cos(E));
+ const x=A*(Math.cos(E)-ee),y=A*Math.sqrt(1-ee*ee)*Math.sin(E),o=(P-(O+O1*T))*D,co=Math.cos(o),so=Math.sin(o),cO=Math.cos(Om),sO=Math.sin(Om),ci=Math.cos(i),si=Math.sin(i);
+ return[(co*cO-so*sO*ci)*x+(-so*cO-co*sO*ci)*y,(co*sO+so*cO*ci)*x+(-so*sO+co*cO*ci)*y,so*si*x+co*si*y]}
+function planetsRD(t){const T=(jd(t)-2451545)/36525,ep=(23.439-.013*T)*D,Ea=helio(EM,T);return PL.map(([n,el])=>{const q=helio(el,T),x=q[0]-Ea[0],y=q[1]-Ea[1],z=q[2]-Ea[2],ye=Math.cos(ep)*y-Math.sin(ep)*z,ze=Math.sin(ep)*y+Math.cos(ep)*z;
+ return{n,ra:(Math.atan2(ye,x)/D/15+24)%24,dec:Math.asin(ze/Math.hypot(x,y,z))/D}})}
+
+/* attractor, void and anomaly styles */
+let kind=0;
+const KN=['','Playful: picks the busiest spot among random points. Chance, not map data.','Playful: picks the emptiest spot among random points. Chance, not map data.','Playful: picks where random points cluster tightest. Chance, not map data.','Uses real map data: looks for spots far from towns and cities.'];
+function setKind(k){kind=k;$('kn').textContent=KN[k];for(let i=0;i<5;i++)$('k'+i).classList.toggle('on',i==k)}
+for(let i=0;i<5;i++)$('k'+i).onclick=()=>setKind(i);
+function pickRaw(o,R,rng){
+ if(!kind)return offset(o,R*Math.sqrt(.01+.99*rng()),rng()*6.2832);
+ const N=kind==3?400:1200,P=Array.from({length:N},()=>offset(o,R*Math.sqrt(rng()),rng()*6.2832));
+ if(kind==3){let b=1e18,m=P[0];for(let i=0;i<N;i++)for(let j=i+1;j<N;j++){const d=dist(P[i],P[j]);if(d<b){b=d;m={lat:(P[i].lat+P[j].lat)/2,lon:(P[i].lon+P[j].lon)/2}}}return m}
+ const G=10,sz=2*R/G,C={};
+ for(const q of P){const x=(q.lon-o.lon)*D*6371000*Math.cos(o.lat*D),y=(q.lat-o.lat)*D*6371000,k=Math.floor((x+R)/sz)+','+Math.floor((y+R)/sz);C[k]=(C[k]||0)+1}
+ let best=[0,0],bv=kind==1?-1:1e9;
+ for(let i=0;i<G;i++)for(let j=0;j<G;j++){const cx=(i+.5)*sz-R,cy=(j+.5)*sz-R;if(Math.hypot(cx,cy)>R*.85)continue;const v=C[i+','+j]||0;if((kind==1?v>bv:v<bv)||(v==bv&&rng()<.3)){bv=v;best=[cx,cy]}}
+ const jx=best[0]+(rng()-.5)*sz,jy=best[1]+(rng()-.5)*sz;return offset(o,Math.hypot(jx,jy),Math.atan2(jx,jy))}
+
+/* sigil drawn from your intention while searching */
+function sigil(t){const q=t.toLowerCase().replace(/[^a-z0-9]/g,'')||'x',pts=[...q].slice(0,14).map((c,i)=>{const v=c>='a'?c.charCodeAt(0)-96:+c+1,a=((v*47+i*13)%360)*D;return[50+40*Math.cos(a),50+40*Math.sin(a)]});
+ $('sgp').setAttribute('d','M'+pts.map(c=>c[0].toFixed(1)+' '+c[1].toFixed(1)).join('L'));$('sg').style.display='flex';return new Promise(r=>setTimeout(r,1500))}
+
+/* aurora alerts and moonrise */
+async function aurora(p){try{const j=await(await fetch('https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json',{signal:AbortSignal.timeout?AbortSignal.timeout(8000):undefined})).json(),kp=parseFloat(j[j.length-1][1]),a=Math.abs(p.lat),need=a>=66?1:a>=62?2:a>=58?3:a>=54?4:a>=50?5:a>=47?6:a>=44?7:a>=40?8:9,on=kp>=need;
+ $('x').textContent=on?`Aurora possible here (Kp ${kp})`:'';$('sky').classList.toggle('aurora',on)}catch(e){}}
+function moonEvents(t,la,lo){const o=[],h=q=>{const m=moonRD(q);return altaz(q,la,lo,m.ra,m.dec).alt-.133};let p=h(t);for(let i=1;i<=288;i++){const tt=t+i*3e5,a=h(tt);if((p<0)!=(a<0))o.push([a>p?'moonrise':'moonset',tt]);p=a}return o}
+
+/* sound capture */
+let recData='';
+$('rec').onclick=async()=>{try{const st=await navigator.mediaDevices.getUserMedia({audio:true}),mr=new MediaRecorder(st,{audioBitsPerSecond:24000}),ch=[];$('rec').disabled=true;$('rs').textContent='Listening…';
+ mr.ondataavailable=e=>ch.push(e.data);
+ mr.onstop=()=>{st.getTracks().forEach(t=>t.stop());const r=new FileReader();r.onload=()=>{recData=r.result;$('rs').textContent='Sound captured.';$('rec').disabled=false};r.readAsDataURL(new Blob(ch,{type:mr.mimeType}))};
+ mr.start();setTimeout(()=>mr.stop(),15000)}catch(e){$('rs').textContent='Microphone unavailable.';$('rec').disabled=false}};
+
+/* time capsules: a saved note reappears when you return */
+const seenCap=new Set();
+function capsules(p){const c=load().find(e=>e.cap&&e.lat!=null&&!seenCap.has(e.id)&&dist(p,e)<150);if(!c)return;seenCap.add(c.id);$('cn').textContent=c.note;$('cw').textContent=new Date(c.t).toLocaleDateString()+', '+c.name;$('cd').showModal()}
+$('cx').onclick=()=>$('cd').close();
+
+/* tides for coastal spots */
+async function tide(p){$('tdl').textContent='';try{const j=await(await fetch(`https://marine-api.open-meteo.com/v1/marine?latitude=${p.lat}&longitude=${p.lon}&hourly=sea_level_height_msl&forecast_days=2&timezone=auto`,{signal:AbortSignal.timeout?AbortSignal.timeout(8000):undefined})).json(),H=j.hourly,h=H&&H.sea_level_height_msl;if(!h||h.every(v=>v==null))return;
+ const off=(j.utc_offset_seconds||0)*1000,n=Date.now(),i=Math.max(0,H.time.findIndex(x=>Date.parse(x+'Z')-off>n)-1);if(h[i]==null||h[i+1]==null)return;
+ const up=h[i+1]>h[i];let k=i+1;while(k<h.length-1&&h[k+1]!=null&&(up?h[k+1]>=h[k]:h[k+1]<=h[k]))k++;
+ $('tdl').textContent='Tide '+(up?'rising':'falling')+(k<h.length-1?', '+(up?'high':'low')+' about '+H.time[k].slice(11,16):'')}catch(e){}}
+
+/* ambient soundtrack: the spot's number sets the key, day or night sets the register */
+let ac=null,mg=null,mt=null,mon=0;
+function music(on){clearInterval(mt);
+ if(!on){if(mg)mg.gain.linearRampToValueAtTime(0,ac.currentTime+1.5);return}
+ ac=ac||new(window.AudioContext||window.webkitAudioContext)();ac.resume();
+ mg=ac.createGain();mg.gain.value=0;mg.connect(ac.destination);mg.gain.linearRampToValueAtTime(.2,ac.currentTime+2);
+ const dl=ac.createDelay(1.5),fb=ac.createGain();dl.delayTime.value=.65;fb.gain.value=.5;dl.connect(fb);fb.connect(dl);dl.connect(mg);
+ const q=dest||origin,k=dest?numThread(dest).k:3,root=110*Math.pow(2,k/12),sc=[0,2,4,7,9],night=q?sunAlt(Date.now(),q.lat,q.lon)<-6:true,out=mg;
+ const note=()=>{const t=ac.currentTime,f=root*(night?1:2)*Math.pow(2,sc[Math.floor(Math.random()*5)]/12)*(Math.random()<.3?2:1),o=ac.createOscillator(),g=ac.createGain();
+  o.type=Math.random()<.5?'sine':'triangle';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.3,t+1.5);g.gain.linearRampToValueAtTime(0,t+7);o.connect(g);g.connect(out);g.connect(dl);o.start(t);o.stop(t+7.2)};
+ note();mt=setInterval(note,night?4200:3000)}
+$('mus').onclick=()=>{mon=!mon;$('mus').style.opacity=mon?1:.6;music(mon)};
+
+/* sketch pad */
+const skx=$('sk').getContext('2d');let drw=0,skd=0;
+skx.strokeStyle='#eadfc4';skx.lineWidth=2;skx.lineCap='round';
+const sp=e=>{const r=$('sk').getBoundingClientRect();return[(e.clientX-r.left)*320/r.width,(e.clientY-r.top)*180/r.height]};
+$('sk').onpointerdown=e=>{drw=1;skd=1;const q=sp(e);skx.beginPath();skx.moveTo(q[0],q[1]);$('sk').setPointerCapture(e.pointerId)};
+$('sk').onpointermove=e=>{if(!drw)return;const q=sp(e);skx.lineTo(q[0],q[1]);skx.stroke()};
+$('sk').onpointerup=()=>{drw=0};
+$('skc').onclick=()=>{skx.clearRect(0,0,320,180);skd=0};
+
+/* getting there, and when to leave */
+const SPD=[3,10,35],TW=['on foot','by bike','by car'];let tm=0;
+function setTm(i){tm=i;for(let j=0;j<3;j++)$('tm'+j).classList.toggle('on',j==i)}
+for(let i=0;i<3;i++)$('tm'+i).onclick=()=>setTm(i);
+function goldenLine(d){const t0=$('when').value?new Date($('when').value).getTime():Date.now(),mins=d/1609.34/SPD[tm]*60,ev=sunEvents(t0,dest.lat,dest.lon)[0];let h=`About ${Math.max(1,Math.round(mins))} minutes ${TW[tm]}.`;
+ if(ev&&mins<720){const lv=ev[1]-mins*6e4;h+=lv>t0?` Leave by ${hhmm(lv,dest.lon)} to arrive at ${ev[0]} (${hhmm(ev[1],dest.lon)}).`:` The next ${ev[0]} comes before you could arrive.`}
+ $('rd').insertAdjacentHTML('beforeend','<br>'+h)}
+
+/* collected items, logbook, mood stars and your constellation */
+$('mb').oninput=()=>{$('mbv').textContent=$('mb').value};$('ma').oninput=()=>{$('mav').textContent=$('ma').value};
+const ICO=[['leaf','🍃'],['feather','🪶'],['stone','🪨'],['rock','🪨'],['shell','🐚'],['flower','🌼'],['acorn','🌰'],['cone','🌲'],['key','🗝️'],['coin','🪙'],['bone','🦴'],['berry','🫐'],['mushroom','🍄']];
+const ico=t=>{t=t.toLowerCase();for(const[k,v]of ICO)if(t.includes(k))return v;return'✦'};
+function logbook(){const all=load(),a=all.filter(e=>!e.sync&&e.lat!=null),n=a.length,mi=a.reduce((x,e)=>x+(e.mi||0),0),sy=all.filter(e=>e.sync).length,it=all.filter(e=>e.item),
+ ti=n>=25?'Keeper of Maps':n>=10?'Cartographer':n>=5?'Pathfinder':n>=1?'Wanderer':'Newcomer';
+ return`<div class="entry" style="background:#1a2147;color:var(--paper)"><h2>${ti}</h2><small style="color:var(--dusk)">${n} places, ${Math.round(mi)} miles, ${sy} coincidences logged</small>${it.length?'<p style="font-family:inherit;font-size:15px">Collected: '+it.map(e=>ico(e.item)+' '+esc(e.item)).join(', ')+'</p>':''}</div>`}
+function stars(cv){cv=cv||$('cv');const a=load().filter(e=>!e.sync&&e.lat!=null).sort((x,y)=>x.t-y.t),x=cv.getContext('2d'),W=320;x.clearRect(0,0,W,W);x.fillStyle='#04060f';x.fillRect(0,0,W,W);
+ for(let i=0;i<60;i++){x.fillStyle='#ffffff55';x.fillRect(Math.random()*W,Math.random()*W,1,1)}
+ if(!a.length){$('cvn').textContent='Your constellation begins with your first saved place.';return}
+ const la=a.map(e=>e.lat),lo=a.map(e=>e.lon),n0=Math.min(...la),n1=Math.max(...la),o0=Math.min(...lo),o1=Math.max(...lo),cl=Math.cos((n0+n1)/2*D),pad=48,
+ sp=Math.max(n1-n0,(o1-o0)*cl,.01),sc=(W-2*pad)/sp,
+ P=a.map(e=>[pad+(e.lon-o0)*cl*sc+((W-2*pad)-(o1-o0)*cl*sc)/2,W-pad-(e.lat-n0)*sc-((W-2*pad)-(n1-n0)*sc)/2]);
+ x.strokeStyle='#c9a96a88';x.beginPath();P.forEach((q,i)=>i?x.lineTo(q[0],q[1]):x.moveTo(q[0],q[1]));x.stroke();
+ x.font='13px "IM Fell English",Georgia,serif';x.textAlign='center';
+ a.forEach((e,i)=>{const d=(e.ma||3)-(e.mb||3),c=d>0?'#ffd86b':d<0?'#7fb2ff':'#eadfc4',q=P[i];x.fillStyle=c;x.shadowColor=c;x.shadowBlur=10;x.beginPath();x.arc(q[0],q[1],3+(e.ma||3),0,7);x.fill();x.shadowBlur=0;x.fillStyle='#8e92a8';x.fillText(e.name.split(' near ')[0],q[0],q[1]-12)});
+ $('cvn').textContent='Gold stars are places that lifted your mood, blue ones dipped, pale ones stayed the same. Bigger stars felt brighter.'}
+$('cvx').onclick=()=>$('cstd').close();
+
+/* dream mode: a random place on Earth that has a story */
+async function dreamPoint(){const J=u=>arJ(u,0,8000);let p;
+ for(let i=0;i<(cfg.us?14:10);i++){p=cfg.us?usRand():{lat:Math.asin(2*Math.random()-1)/D,lon:Math.random()*360-180};const w=await J(`https://en.wikipedia.org/w/api.php?action=query&list=geosearch&gscoord=${p.lat}|${p.lon}&gsradius=10000&gslimit=1&format=json&origin=*`);
+  if(w&&w.query&&w.query.geosearch.length){const g=w.query.geosearch[0],q={lat:g.lat,lon:g.lon};if(cfg.us&&!await usOK(q))continue;return q}}
+ return cfg.us?null:p}
+
+/* phone-away mode */
+let wl=null;
+$('paBtn').onclick=async()=>{$('pa').style.display='flex';try{wl=await navigator.wakeLock.request('screen')}catch(e){}};
+$('pa').onclick=()=>{$('pa').style.display='none';try{wl&&wl.release()}catch(e){}};
+
+/* sealed links: coordinates only, revealed in the app when the receiver arrives */
+$('seal').onclick=async()=>{if(!/^https?:$/.test(location.protocol)){say('Sealed links only work once the app is hosted online, for example on GitHub Pages.');return}const u=location.href.split('#')[0]+'#m='+btoa(JSON.stringify([+dest.lat.toFixed(5),+dest.lon.toFixed(5)]));
+ try{await navigator.clipboard.writeText(u);say('Sealed link copied. Send it to someone.')}catch(e){prompt('Copy this sealed link:',u)}};
+let swid=null;
+function openSeal(t){$('sl').showModal();$('sh').textContent='Waiting for your location';$('sr').style.display='none';openSeal.p=null;
+ swid=navigator.geolocation&&navigator.geolocation.watchPosition(async g=>{const me={lat:g.coords.latitude,lon:g.coords.longitude},d=dist(me,t);
+  if(d>120){$('sh').textContent=(d<1000?'Within '+Math.ceil(d/100)*100+' meters':(d/1609.34).toFixed(1)+' miles away')+(openSeal.p!=null?(d<openSeal.p?'. Warmer.':'. Colder.'):'');openSeal.p=d;return}
+  navigator.geolocation.clearWatch(swid);$('sh').textContent='You are here.';const T=await threads(t);t.title=EP[T.nt.k]+' near '+(T.pg?T.pg.title:(t.town||'here'));
+  $('sr').innerHTML=`<h2>${esc(t.title)}</h2><p>${esc(T.nt.line)}</p>${T.pg?`<p>${esc(T.pg.extract||T.pg.title)}</p>`:''}<p class="vs">${verse(t)}</p>`;$('sr').style.display='block'},()=>{$('sh').textContent='Location unavailable'},{enableHighAccuracy:true})}
+$('slx').onclick=()=>{if(swid!=null)navigator.geolocation.clearWatch(swid);$('sl').close()};
+if(location.hash.startsWith('#m=')){try{const c=JSON.parse(atob(location.hash.slice(3)));if(Array.isArray(c)&&c.length==2&&c.every(isFinite))openSeal({lat:+c[0],lon:+c[1]})}catch(e){}}
+
+/* dark-sky finder: far from towns and cities, a stand-in for light pollution */
+const GLOW={city:25000,town:10000,suburb:5000,village:3000,hamlet:1000},
+ TIERS=[['city|town|village|hamlet','settlement'],['city|town|village','village or larger'],['city|town','town or larger'],['city','city']];
+let dkP=null,dkTier=0;
+const dkVal=p=>{let m=1e9;for(const q of dkP)m=Math.min(m,dist(p,q)-q.g);return m};
+async function darkRaw(o,R,rng){
+ if(dkP===null){dkP=[];
+  let t=R<=4e4?0:R<=15e4?1:R<=4e5?2:3;
+  for(;t<4;t++){
+   const q=`[out:json][timeout:20];node["place"~"^(${TIERS[t][0]})$"](around:${Math.round(R*1.25)},${o.lat},${o.lon});out 1500 qt;`;
+   try{const j=await ovp(q,14000);if(!j){dkP=[];break}
+    dkP=j.elements.map(e=>({lat:e.lat,lon:e.lon,name:(e.tags||{}).name||'',g:GLOW[(e.tags||{}).place]||1000}));dkTier=t;
+    if(dkP.length<1500)break}catch(e){dkP=[];break}}}
+ const C=Array.from({length:400},()=>offset(o,R*Math.sqrt(rng()),rng()*6.2832));
+ if(!dkP.length)return C[0];
+ let b=C[0],bv=-1e18;for(const c of C){const v=dkVal(c);if(v>bv){bv=v;b=c}}return b}
+function darkNote(){const p=dest,t=$('when').value?new Date($('when').value).getTime():Date.now();let h;
+ if(dkP&&dkP.length){const n=dkP.reduce((a,b)=>dist(p,b)<dist(p,a)?b:a),v=dkVal(p);
+  h=`Dark-sky guess: ${v>2e4?'likely very dark':v>8e3?'likely dark':v>2e3?'moderately dark':'probably light-polluted'}. The nearest ${TIERS[dkTier][1]} in the map data${n.name?', '+esc(n.name)+',':''} is ${(dist(p,n)/1609.34).toFixed(1)} miles away. This estimates from settlement locations and is not a measured reading.`}
+ else h='Dark-sky guess unavailable, because the settlement data did not load. This is a random spot.';
+ let dt=null;for(let i=0;i<=432;i++){const q=t+i*3e5;if(sunAlt(q,p.lat,p.lon)<-18){dt=q;break}}
+ if(dt!=null){const m=moonRD(dt),ma=altaz(dt,p.lat,p.lon,m.ra,m.dec).alt,ph=((jd(dt)-2451550.1)/29.530588853%1+1)%1,il=Math.round((1-Math.cos(ph*2*Math.PI))/2*100);
+  h+=(dt===t?' The sky is already fully dark then.':` Full darkness begins about ${hhmm(dt,p.lon)} (local).`)+` The moon will be ${il}% lit and ${ma>0?'above':'below'} the horizon.`}
+ else h+=' There is no full darkness in the next day and a half at this latitude and date.';
+ $('th').insertAdjacentHTML('afterbegin','<p>'+h+'</p>')}
+
+/* public-domain verses, shown on arrival (n: night only, d: day only) */
+const VS=[
+['To see a World in a Grain of Sand\nAnd a Heaven in a Wild Flower,\nHold Infinity in the palm of your hand\nAnd Eternity in an hour.','William Blake, Auguries of Innocence',''],
+["The world is too much with us; late and soon,\nGetting and spending, we lay waste our powers;\nLittle we see in Nature that is ours;",'William Wordsworth, The World Is Too Much with Us',''],
+['Afoot and light-hearted I take to the open road,\nHealthy, free, the world before me,\nThe long brown path before me leading wherever I choose.','Walt Whitman, Song of the Open Road',''],
+["I am a part of all that I have met;\nYet all experience is an arch wherethro'\nGleams that untravell'd world, whose margin fades\nFor ever and for ever when I move.",'Alfred, Lord Tennyson, Ulysses',''],
+['I never saw a Moor —\nI never saw the Sea —\nYet know I how the Heather looks\nAnd what a Billow be.','Emily Dickinson',''],
+['Glory be to God for dappled things—\nFor skies of couple-colour as a brinded cow;\nFor rose-moles all in stipple upon trout that swim;','Gerard Manley Hopkins, Pied Beauty',''],
+['I loafe and invite my soul,\nI lean and loafe at my ease observing a spear of summer grass.','Walt Whitman, Song of Myself',''],
+["Who has seen the wind?\nNeither I nor you:\nBut when the leaves hang trembling\nThe wind is passing thro'.",'Christina Rossetti, Sing-Song',''],
+['A thing of beauty is a joy for ever:\nIts loveliness increases; it will never\nPass into nothingness;','John Keats, Endymion',''],
+['Home is the sailor, home from sea,\nAnd the hunter home from the hill.','Robert Louis Stevenson, Requiem',''],
+['Season of mists and mellow fruitfulness,\nClose bosom-friend of the maturing sun;','John Keats, To Autumn',''],
+['To make a prairie it takes a clover and one bee,\nOne clover, and a bee,\nAnd revery.\nThe revery alone will do,\nIf bees are few.','Emily Dickinson','d'],
+["I wandered lonely as a cloud\nThat floats on high o'er vales and hills,",'William Wordsworth, Daffodils','d'],
+["The year's at the spring,\nAnd day's at the morn;\nMorning's at seven;\nThe hill-side's dew-pearled;",'Robert Browning, Pippa Passes','d'],
+["Till rising and gliding out I wander'd off by myself,\nIn the mystical moist night-air, and from time to time,\nLook'd up in perfect silence at the stars.","Walt Whitman, When I Heard the Learn'd Astronomer",'n'],
+['And the night shall be filled with music,\nAnd the cares, that infest the day,\nShall fold their tents, like the Arabs,\nAnd as silently steal away.','Henry Wadsworth Longfellow, The Day Is Done','n'],
+['How sweet the moonlight sleeps upon this bank!\nHere will we sit and let the sounds of music\nCreep in our ears;','William Shakespeare, The Merchant of Venice','n'],
+['Slowly, silently, now the moon\nWalks the night in her silver shoon;\nThis way, and that, she peers, and sees\nSilver fruit upon silver trees;','Walter de la Mare, Silver','n']];
+let skipV=0;
+function verse(p){const nt=sunAlt(Date.now(),p.lat,p.lon)<-6,pool=VS.filter(v=>!v[2]||v[2]==(nt?'n':'d')),v=pool[hash(p.lat.toFixed(3)+p.lon.toFixed(3))%pool.length];
+ return esc(v[0]).replace(/\n/g,'<br>')+'<small>'+esc(v[1])+'</small>'}
+
+/* atlas poster: fogged map, constellation and logbook on one sheet */
+const rank=n=>n>=25?'Keeper of Maps':n>=10?'Cartographer':n>=5?'Pathfinder':n>=1?'Wanderer':'Newcomer';
+function flourish(){const v=load().filter(e=>e.lat!=null&&!e.sync);if(v.length<2)return;dragL=L.layerGroup();
+ v.slice(-3).forEach(e=>{const q=offset(e,5000+hash(String(e.id))%4000,(hash(String(e.id)+'d')%628)/100);if(v.some(w=>dist(w,q)<2600))return;
+  L.marker([q.lat,q.lon],{interactive:false,icon:L.divIcon({className:'',html:'<div class="dr">~ Here be dragons ~</div>',iconSize:[140,20],iconAnchor:[70,10]})}).addTo(dragL)});dragL.addTo(map)}
+function serpent(x,cx,cy,s){x.save();x.translate(cx,cy);x.scale(s,s);x.strokeStyle=x.fillStyle='#eadfc4';x.lineWidth=2.4;x.lineCap='round';
+ x.beginPath();x.moveTo(-60,10);x.bezierCurveTo(-45,-20,-30,25,-12,-2);x.bezierCurveTo(2,-22,16,14,30,-4);x.stroke();
+ x.beginPath();x.moveTo(30,-4);x.lineTo(47,-13);x.lineTo(51,-4);x.lineTo(40,3);x.closePath();x.fill();
+ x.lineWidth=1.5;for(const[a,b]of[[-40,-6],[-22,6],[-4,-14],[12,-8]]){x.beginPath();x.moveTo(a,b);x.lineTo(a+3,b-8);x.stroke()}x.restore()}
+function wrapT(x,t,x0,y,mw,lh){let l='';for(const w of t.split(' ')){const n=l?l+' '+w:w;if(x.measureText(n).width>mw&&l){x.fillText(l,x0,y);y+=lh;l=w}else l=n}if(l){x.fillText(l,x0,y);y+=lh}return y}
+async function poster(){
+ const all=load(),a=all.filter(e=>!e.sync&&e.lat!=null).sort((p,q)=>p.t-q.t);
+ if(!a.length){alert('Save a visited place first, and your atlas will begin.');return}
+ try{await document.fonts.load('italic 40px "IM Fell English"')}catch(e){}
+ const x=$('apc').getContext('2d'),W=800,H=1100,F='"IM Fell English",Georgia,serif';
+ x.clearRect(0,0,W,H);x.fillStyle='#e6d9b8';x.fillRect(0,0,W,H);
+ for(let i=0;i<2500;i++){x.fillStyle=`rgba(90,70,30,${Math.random()*.06})`;x.fillRect(Math.random()*W,Math.random()*H,1.5,1.5)}
+ x.strokeStyle='#5a4524';x.lineWidth=3;x.strokeRect(24,24,W-48,H-48);x.lineWidth=1;x.strokeRect(34,34,W-68,H-68);
+ const mi=Math.round(a.reduce((s,e)=>s+(e.mi||0),0)),d0=new Date(a[0].t).toLocaleDateString(),d1=new Date(a[a.length-1].t).toLocaleDateString();
+ x.fillStyle='#3a2c14';x.textAlign='center';x.font=`15px ${F}`;x.fillText('A   D R I F T   A T L A S',W/2,80);
+ x.font=`italic 54px ${F}`;x.fillText(rank(a.length),W/2,138);
+ x.font=`16px ${F}`;x.fillText(`${a.length} place${a.length>1?'s':''}, ${mi} miles, ${d0==d1?d0:d0+' to '+d1}`,W/2,166);
+ const MX=60,MY=190,MW=680,MH=470,la=a.map(e=>e.lat),lo=a.map(e=>e.lon),n0=Math.min(...la),n1=Math.max(...la),o0=Math.min(...lo),o1=Math.max(...lo),cl=Math.cos((n0+n1)/2*D),
+  wx=(o1-o0)*cl*111320+8000,wy=(n1-n0)*111320+8000,sc=Math.min(MW/wx,MH/wy),cx0=(o0+o1)/2,cy0=(n0+n1)/2,
+  P=a.map(e=>[MW/2+(e.lon-cx0)*cl*111320*sc,MH/2-(e.lat-cy0)*111320*sc]),R=Math.max(2000*sc,30);
+ const mc=document.createElement('canvas');mc.width=MW;mc.height=MH;const m=mc.getContext('2d');
+ m.fillStyle='#d9c9a0';m.fillRect(0,0,MW,MH);m.strokeStyle='#8a7a5233';m.lineWidth=1;
+ for(let g=0;g<=MW;g+=68){m.beginPath();m.moveTo(g,0);m.lineTo(g,MH);m.stroke()}for(let g=0;g<=MH;g+=68){m.beginPath();m.moveTo(0,g);m.lineTo(MW,g);m.stroke()}
+ const fc=document.createElement('canvas');fc.width=MW;fc.height=MH;const f=fc.getContext('2d');f.fillStyle='rgba(10,14,31,.9)';f.fillRect(0,0,MW,MH);f.globalCompositeOperation='destination-out';
+ for(const q of P){const g=f.createRadialGradient(q[0],q[1],R*.55,q[0],q[1],R);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');f.fillStyle=g;f.beginPath();f.arc(q[0],q[1],R,0,7);f.fill()}
+ m.drawImage(fc,0,0);
+ let dr=0;for(const[ax,ay]of[[100,70],[MW-130,70],[100,MH-80],[MW/2,MH-60],[MW/2,60],[70,MH/2]]){if(dr>=3)break;if(P.every(q=>Math.hypot(q[0]-ax,q[1]-ay)>R+90)){serpent(m,ax,ay-8,1);m.fillStyle='#eadfc4bb';m.font=`italic 15px ${F}`;m.textAlign='center';m.fillText('Here be dragons',ax,ay+26);dr++}}
+ m.strokeStyle='#c9a96a';m.lineWidth=1.6;m.setLineDash([5,6]);m.beginPath();P.forEach((q,i)=>i?m.lineTo(q[0],q[1]):m.moveTo(q[0],q[1]));m.stroke();m.setLineDash([]);
+ m.font=`italic 14px ${F}`;m.textAlign='center';
+ a.forEach((e,i)=>{const q=P[i],nm=(e.name.split(' near ')[1]||e.name.split(' near ')[0]).slice(0,22);m.shadowColor='#c9a96a';m.shadowBlur=12;m.fillStyle='#ffd86b';m.beginPath();m.arc(q[0],q[1],5,0,7);m.fill();m.shadowBlur=0;const lx=Math.max(60,Math.min(MW-60,q[0]));m.lineWidth=3;m.strokeStyle='#0a0e1fcc';m.strokeText(nm,lx,q[1]-12);m.fillStyle='#f3ead2';m.fillText(nm,lx,q[1]-12)});
+ m.save();m.translate(MW-54,MH-54);m.fillStyle='#c9a96a';m.beginPath();m.moveTo(0,-30);m.lineTo(6,-6);m.lineTo(30,0);m.lineTo(6,6);m.lineTo(0,30);m.lineTo(-6,6);m.lineTo(-30,0);m.lineTo(-6,-6);m.closePath();m.fill();m.fillStyle='#eadfc4';m.font=`italic 16px ${F}`;m.fillText('N',0,-36);m.restore();
+ x.drawImage(mc,MX,MY);x.strokeStyle='#5a4524';x.lineWidth=2;x.strokeRect(MX,MY,MW,MH);
+ const s2=document.createElement('canvas');s2.width=s2.height=320;stars(s2);x.drawImage(s2,MX,700,330,330);x.strokeRect(MX,700,330,330);
+ const up=a.filter(e=>(e.ma||3)>(e.mb||3)).length,dn=a.filter(e=>(e.ma||3)<(e.mb||3)).length,it=all.filter(e=>e.item).map(e=>e.item),sy=all.filter(e=>e.sync).length;
+ x.textAlign='left';x.fillStyle='#3a2c14';x.font=`italic 26px ${F}`;x.fillText('Logbook',420,730);x.font=`16px ${F}`;let y=762;
+ y=wrapT(x,`Places lifted your mood: ${up}. Places that dipped it: ${dn}.`,420,y,320,22)+6;
+ y=wrapT(x,`Coincidences logged: ${sy}.`,420,y,320,22)+6;
+ if(it.length)y=wrapT(x,'Collected: '+it.slice(0,10).join(', ')+'.',420,y,320,22)+6;
+ x.fillStyle='#5a4a28';x.font=`italic 14px ${F}`;wrapT(x,'Gold stars are places that lifted your mood, blue ones dipped, pale ones stayed the same. The fog shows where you have not been yet.',420,Math.max(y+10,900),320,20);
+ x.textAlign='center';x.fillStyle='#5a4a28';x.font=`13px ${F}`;x.fillText('Drawn from your Drift journal, '+new Date().toLocaleDateString(),W/2,1054);
+ $('apd').showModal()}
+$('apx').onclick=()=>$('apd').close();
+$('aps').onclick=()=>$('apc').toBlob(async b=>{const f=new File([b],'drift-atlas.png',{type:'image/png'});
+ try{if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'My Drift atlas'});return}}catch(e){if(e&&e.name==='AbortError')return}
+ const u=URL.createObjectURL(b),l=document.createElement('a');l.href=u;l.download='drift-atlas.png';l.click();setTimeout(()=>URL.revokeObjectURL(u),4000)},'image/png');
+
+/* more name threads: historic sites, old place names, notable births */
+
+/* ===== Around here: extra cards about the place, each loaded when opened ===== */
+var arOvm;
+function arJ(u,o,ms){return fetch(u,Object.assign({signal:AbortSignal.timeout?AbortSignal.timeout(ms||12000):undefined},o||{})).then(r=>r.ok?r.json():null).catch(()=>null)}
+function arCtx(p){const l=p.loc||{},cc=String(l.cc||'').toLowerCase();return{city:cleanT(l.city||p.town||''),county:String(l.county||'').replace(/\s+(County|Parish|Borough)$/i,'').trim(),state:String(l.state||''),cc,us:cc==='us'}}
+function arFd(m){return(m/1609.34).toFixed(1)+' mi'}
+function arLink(u,t){return`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`}
+function arEnc(s){return encodeURIComponent(s)}
+function arNote(h){return`<p class="note">${h}</p>`}
+function arYmd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function arArr(v){return[].concat(v||[]).map(z=>String(z))}
+function arQ(s){return String(s).replace(/["\\]/g,'')}
+const OV=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+async function ovp(q,ms){for(const u of OV){const j=await arJ(u,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q)},ms);if(j&&j.elements)return j}return null}
+function arOvp(p){arOvm=arOvm||new WeakMap();
+ if(!arOvm.has(p)){const a=r=>`(around:${r},${p.lat},${p.lon})`,
+  q=`[out:json][timeout:20];(way["waterway"~"^(river|stream|canal)$"]["name"]${a(5000)};nwr["natural"="water"]["name"]${a(5000)};way["railway"~"^(abandoned|disused|razed)$"]${a(6000)};nwr["landuse"="cemetery"]["name"]${a(6000)};nwr["amenity"="grave_yard"]["name"]${a(6000)};nwr["historic"~"^(ruins|mine|mill|archaeological_site)$"]${a(6000)};nwr["abandoned:place"]${a(10000)};nwr["disused:place"]${a(10000)};nwr["disused:amenity"~"^(school|place_of_worship)$"]${a(6000)};nwr["abandoned:amenity"~"^(school|place_of_worship)$"]${a(6000)};nwr["historic"]["name"]${a(4000)};nwr["old_name"]${a(4000)};);out tags center 300;`,
+  pr=ovp(q,16000).then(j=>{if(!j)arOvm.delete(p);return j});
+  arOvm.set(p,pr)}
+ return arOvm.get(p)}
+
+/* local histories, atlases and directories (Internet Archive) */
+async function arHist(p,b){await locate(p);const c=arCtx(p),q=[],hist='(history OR atlas OR gazetteer OR directory OR biographical OR centennial OR genealogy)';
+ if(c.county)q.push(`(title:("${arQ(c.county)} County") OR subject:("${arQ(c.county)} County")) AND "${arQ(c.state||c.county)}" AND mediatype:texts AND ${hist}`);
+ if(c.city)q.push(`title:("${arQ(c.city)}") AND mediatype:texts AND ${hist}${c.state?` AND "${arQ(c.state)}"`:''}`);
+ if(!q.length){b.innerHTML=arNote('Not enough place information to look for books here.');return}
+ const rs=await Promise.all(q.map(s=>arJ('https://archive.org/advancedsearch.php?q='+arEnc(s)+'&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=year&fl%5B%5D=creator&sort%5B%5D=downloads+desc&rows=6&page=1&output=json')));
+ if(rs.every(r=>!r))throw 0;
+ const seen=new Set(),docs=[];
+ for(const r of rs)for(const d of(r&&r.response&&r.response.docs)||[]){if(!d.identifier||seen.has(d.identifier))continue;seen.add(d.identifier);docs.push(d)}
+ const sq=[c.city,c.county?c.county+' County':'',c.state].filter(Boolean).join(' ')+' history',
+  more=`<p>${arLink('https://archive.org/search?query='+arEnc(sq)+'&and%5B%5D=mediatype%3A%22texts%22','More at the Internet Archive')} &middot; ${arLink('https://catalog.hathitrust.org/Search/Home?lookfor='+arEnc(sq)+'&type=all','HathiTrust')}</p>`;
+ if(!docs.length){b.innerHTML=arNote('No digitized local histories turned up by name. Try these wider searches.')+more;return}
+ b.innerHTML=arNote('Digitized local histories, atlases and directories you can read for free.')+docs.slice(0,6).map(d=>{const t=arArr(d.title)[0]||'Untitled',by=arArr(d.creator)[0]||'',y=arArr(d.year)[0]||'';
+  return`<p>${arLink('https://archive.org/details/'+d.identifier,t.length>110?t.slice(0,107)+'…':t)}<small>${esc([y,by.length>60?by.slice(0,57)+'…':by].filter(Boolean).join(' · '))}</small></p>`}).join('')+more}
+
+/* other newspaper archives, by state or country */
+function arNews(p,b){const c=arCtx(p),st=c.state.toLowerCase(),
+ US={'new york':['NYS Historic Newspapers','https://nyshistoricnewspapers.org/'],'illinois':['Illinois Digital Newspaper Collections','https://idnc.library.illinois.edu/'],'texas':['Portal to Texas History, newspapers','https://texashistory.unt.edu/explore/collections/TDNP/'],'california':['California Digital Newspaper Collection','https://cdnc.ucr.edu/'],'pennsylvania':['Pennsylvania Newspaper Archive','https://panewsarchive.psu.edu/'],'colorado':['Colorado Historic Newspapers','https://www.coloradohistoricnewspapers.org/'],'utah':['Utah Digital Newspapers','https://newspapers.lib.utah.edu/'],'washington':['Washington Digital Newspapers','https://washingtondigitalnewspapers.org/'],'virginia':['Virginia Chronicle','https://virginiachronicle.com/'],'minnesota':['Minnesota Digital Newspaper Hub','https://newspapers.mnhs.org/'],'michigan':['Digital Michigan Newspapers','https://digmichnews.cmich.edu/'],'georgia':['Georgia Historic Newspapers','https://gahistoricnewspapers.galileo.usg.edu/'],'indiana':['Hoosier State Chronicles','https://newspapers.library.in.gov/'],'north carolina':['DigitalNC newspapers','https://newspapers.digitalnc.org/'],'oregon':['Historic Oregon Newspapers','https://oregonnews.uoregon.edu/'],'montana':['Montana Newspapers','https://montananewspapers.org/'],'oklahoma':['The Gateway to Oklahoma History','https://gateway.okhistory.org/'],'ohio':['Ohio Memory','https://ohiomemory.org/']},
+ INT={au:['Trove, Australian newspapers','https://trove.nla.gov.au/search/category/newspapers'],nz:['Papers Past, New Zealand','https://paperspast.natlib.govt.nz/'],nl:['Delpher, Dutch newspapers','https://www.delpher.nl/nl/kranten'],ca:['Canadiana, Canadian newspapers','https://www.canadiana.ca/']},
+ rows=[];
+ if(c.us&&US[st])rows.push(US[st]);
+ if(!c.us&&INT[c.cc])rows.push(INT[c.cc]);
+ if(!c.us&&c.cc==='gb'&&/wales/i.test(c.state))rows.push(['Welsh Newspapers Online','https://newspapers.library.wales/']);
+ if(c.us)rows.push(['Which papers were published here (US Newspaper Directory)','https://www.loc.gov/collections/directory-of-us-newspapers-in-american-libraries/?q='+arEnc(c.city||c.county||c.state)]);
+ if(!c.us)rows.push(['Europeana newspapers','https://www.europeana.eu/en/collections/topic/18-newspapers']);
+ rows.push(['Google News Archive','https://news.google.com/newspapers'],['Wikipedia: list of online newspaper archives','https://en.wikipedia.org/wiki/List_of_online_newspaper_archives']);
+ b.innerHTML=arNote('Chronicling America has gaps, so these can fill them. Links open each archive&rsquo;s own site.')+rows.map(r=>`<p>${arLink(r[1],r[0])}</p>`).join('')}
+
+/* photos and maps: Commons, Library of Congress, Sanborn, USGS topo */
+async function arPics(p,b){await locate(p);const c=arCtx(p),place=[c.city,c.state].filter(Boolean).join(' ');
+ const[cj,lo]=await Promise.all([
+  arJ(`https://commons.wikimedia.org/w/api.php?action=query&generator=geosearch&ggscoord=${p.lat}|${p.lon}&ggsradius=10000&ggsnamespace=6&ggslimit=14&prop=imageinfo&iiprop=url&iiurlwidth=240&format=json&origin=*`),
+  place?getJ(`https://www.loc.gov/photos/?q=${arEnc(place)}&fa=online-format:image&fo=json&at=results&c=6`):Promise.resolve({err:'none'})]);
+ let h='';
+ const cm=cj&&cj.query?Object.values(cj.query.pages).sort((x,y)=>x.index-y.index).map(g=>{const i=g.imageinfo&&g.imageinfo[0];return i&&/^https:/.test(i.thumburl||'')?{u:i.descriptionurl||'',t:i.thumburl,n:String(g.title||'').replace(/^File:/,'').replace(/\.[a-z0-9]+$/i,'')}:null}).filter(Boolean):[];
+ if(cm.length)h+=`<p class="sub">Photos taken nearby (Wikimedia Commons)</p><div class="strip">${cm.map(x=>`<a href="${esc(x.u)}" target="_blank" rel="noopener"><img loading="lazy" src="${esc(x.t)}" alt="">${esc(x.n.length>46?x.n.slice(0,44)+'…':x.n)}</a>`).join('')}</div>`;
+ const ls=!lo.err?lo.j.results.map(i=>{let im=arArr(i.image_url)[0]||'';if(im.startsWith('//'))im='https:'+im;const u=String(i.url||i.id||'');return/^https:/.test(im)&&/^https?:/.test(u)?{u,t:im,n:String(i.title||'Photo').replace(/\s+/g,' ')}:null}).filter(Boolean).slice(0,6):[];
+ if(ls.length)h+=`<p class="sub">From the Library of Congress</p><div class="strip">${ls.map(x=>`<a href="${esc(x.u)}" target="_blank" rel="noopener"><img loading="lazy" src="${esc(x.t)}" alt="">${esc(x.n.length>46?x.n.slice(0,44)+'…':x.n)}</a>`).join('')}</div>`;
+ const lk=[];
+ if(c.us){lk.push(arLink('https://www.loc.gov/collections/sanborn-maps/?q='+arEnc(place),'Sanborn fire-insurance maps'));lk.push(arLink(`https://ngmdb.usgs.gov/topoview/viewer/#13/${p.lat.toFixed(4)}/${p.lon.toFixed(4)}`,'Old USGS topo maps of this spot'))}
+ lk.push(arLink('https://www.loc.gov/photos/?q='+arEnc(place||c.state),'More Library of Congress photos'));
+ if(!cm.length&&!ls.length)h+=arNote('No photos were found by location. These links search further.');
+ b.innerHTML=h+`<p>${lk.join(' &middot; ')}</p>`+(cm.length?arNote('Tap a photo for its credit and license.'):'')}
+
+/* wildlife: iNaturalist research-grade sightings */
+async function arNat(p,b){const us=arCtx(p).us,j=await arJ(`https://api.inaturalist.org/v1/observations/species_counts?lat=${p.lat.toFixed(4)}&lng=${p.lon.toFixed(4)}&radius=5&d1=${arYmd(new Date(Date.now()-365*864e5))}&quality_grade=research&per_page=8&locale=en`);
+ if(!j)throw 0;
+ const rs=(j.results||[]).filter(r=>r.taxon);
+ if(!rs.length){b.innerHTML=arNote('No verified sightings recorded within 3 miles in the past year.');return}
+ b.innerHTML=arNote('Most often recorded within about 3 miles (5 km) over the past year, by volunteers on iNaturalist.')+rs.map(r=>{const t=r.taxon,nm=t.preferred_common_name||t.name,ph=t.default_photo&&t.default_photo.square_url;
+  return`<div class="rw">${ph&&/^https:/.test(ph)?`<img loading="lazy" src="${esc(ph)}" alt="">`:''}<div>${arLink('https://www.inaturalist.org/taxa/'+t.id,nm)}<small>${nm!==t.name?'<i>'+esc(t.name)+'</i> · ':''}${r.count} sighting${r.count==1?'':'s'}</small></div></div>`}).join('')
+  +`<p>${arLink(`https://www.inaturalist.org/observations?lat=${p.lat.toFixed(4)}&lng=${p.lon.toFixed(4)}&radius=5`,'See all sightings here')}</p>`}
+
+/* ground and water: bedrock, elevation, nearest named water */
+async function arGeo(p,b){await locate(p);const us=arCtx(p).us,
+ [mj,ej,ov]=await Promise.all([arJ(`https://macrostrat.org/api/v2/geologic_units/map?lat=${p.lat.toFixed(4)}&lng=${p.lon.toFixed(4)}&response=long&format=json`),arJ(`https://api.open-meteo.com/v1/elevation?latitude=${p.lat.toFixed(4)}&longitude=${p.lon.toFixed(4)}`),arOvp(p)]);
+ if(!mj&&!ej&&!ov)throw 0;
+ let h='';
+ const u=mj&&mj.success&&Array.isArray(mj.success.data)?mj.success.data[0]:null;
+ if(u){const nm=u.name||u.strat_name,ages=[...new Set([u.b_int_name,u.t_int_name].filter(Boolean))],ma=u.b_age!=null&&u.t_age!=null&&isFinite(u.b_age)&&isFinite(u.t_age)?` (${Math.round(u.t_age)}${Math.round(u.t_age)==Math.round(u.b_age)?'':' to '+Math.round(u.b_age)} million years ago)`:'',ds=String(u.descrip||u.comments||'').replace(/\s+/g,' ').trim();
+  h+=`<p><b>Bedrock:</b> ${esc(nm||'unnamed unit')}${u.lith?`<small>${esc(String(u.lith))}</small>`:''}${ages.length?`<small>${esc(ages.join(' to '))}${ma}</small>`:''}${ds?`<small>${esc(ds.length>260?ds.slice(0,257)+'…':ds)}</small>`:''}</p>`}
+ const el=ej&&Array.isArray(ej.elevation)?ej.elevation[0]:null;
+ if(el!=null&&isFinite(el))h+=`<p><b>Elevation:</b> ${Math.round(el*3.28084).toLocaleString()} ft (${Math.round(el).toLocaleString()} m)</p>`;
+ const wat=new Map();
+ for(const e of(ov&&ov.elements)||[]){const t=e.tags||{};if(!t.name||!(t.waterway||t.natural==='water'))continue;const pp=e.center||e;if(pp.lat==null)continue;const dd=dist(p,pp);if(!wat.has(t.name)||dd<wat.get(t.name))wat.set(t.name,dd)}
+ const wl=[...wat].sort((x,y)=>x[1]-y[1]).slice(0,3);
+ if(wl.length)h+=`<p><b>Nearest named water:</b>${wl.map(w=>`<small>${esc(w[0])}, about ${arFd(w[1],us)} away</small>`).join('')}</p>`;
+ else if(ov)h+=`<p><b>Nearest named water:</b><small>None within about 3 miles.</small></p>`;
+ b.innerHTML=h||arNote('No ground or water details were found here.')}
+
+/* weather today and on this date in past years (Open-Meteo) */
+async function arWx(p,b){const us=true,now=new Date(),md=String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0'),md2=md==='02-29'?'02-28':md,
+ q=`daily=temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum&timezone=auto&temperature_unit=${us?'fahrenheit':'celsius'}&precipitation_unit=${us?'inch':'mm'}`,yrs=[1950,1975,2000],la=p.lat.toFixed(3),lo=p.lon.toFixed(3);
+ const[t,...hh]=await Promise.all([arJ(`https://api.open-meteo.com/v1/forecast?latitude=${la}&longitude=${lo}&${q}&forecast_days=1`),...yrs.map(y=>arJ(`https://archive-api.open-meteo.com/v1/archive?latitude=${la}&longitude=${lo}&start_date=${y}-${md2}&end_date=${y}-${md2}&${q}`))]);
+ if(!t&&hh.every(x=>!x))throw 0;
+ const row=(lbl,j)=>{const d=j&&j.daily;if(!d||!d.time||!d.time.length)return`<tr><td>${lbl}</td><td colspan="2">no record</td></tr>`;
+  const hi=d.temperature_2m_max[0],lw0=d.temperature_2m_min[0],pr=d.precipitation_sum[0],sn=d.snowfall_sum[0],r0=v=>v==null?'–':Math.round(v)+'°';
+  return`<tr><td>${lbl}</td><td>${r0(hi)} / ${r0(lw0)}</td><td>${pr==null?'–':(+pr).toFixed(us?2:1)+(us?' in':' mm')}${sn>0?', snow '+(+sn).toFixed(1)+(us?' in':' cm'):''}</td></tr>`};
+ b.innerHTML=arNote('High and low, and rain, for '+esc(now.toLocaleDateString(undefined,{month:'long',day:'numeric'}))+'.')+`<table><tr><th>Year</th><th>High / low</th><th>Precipitation</th></tr>${row('Today',t)}${yrs.map((y,i)=>row(y,hh[i])).join('')}</table>`
+  +arNote('Earlier years are a computer reconstruction of past weather (ERA5) on a coarse grid, so treat them as a good estimate, not an official record.')}
+
+/* hidden history: historic places, old rail beds, ruins, cemeteries, former schools and churches */
+async function arOld(p,b){await locate(p);const us=arCtx(p).us,
+ [ov,wj]=await Promise.all([arOvp(p),arJ(`https://en.wikipedia.org/w/api.php?action=query&generator=geosearch&ggscoord=${p.lat}|${p.lon}&ggsradius=10000&ggslimit=50&prop=categories|coordinates&cllimit=max&clshow=!hidden&format=json&origin=*`)]);
+ if(!ov&&!wj)throw 0;
+ let h='';
+ const hist=wj&&wj.query?Object.values(wj.query.pages).filter(g=>arArr((g.categories||[]).map(c=>c.title)).some(t=>/National Register|Historic|Ghost town|Cemeter|Abandoned|Covered bridge|Canal|Battle|Mills? in/i.test(t))).map(g=>{const co=g.coordinates&&g.coordinates[0];return{g,d:co?dist(p,{lat:co.lat,lon:co.lon}):1e9}}).sort((x,y)=>x.d-y.d).slice(0,8):[];
+ if(hist.length)h+=`<p class="sub">Historic places</p>`+hist.map(x=>`<p>${arLink('https://en.wikipedia.org/?curid='+x.g.pageid,x.g.title)}${x.d<1e8?`<small>${arFd(x.d,us)} away</small>`:''}</p>`).join('');
+ const els=(ov&&ov.elements)||[],tg=e=>e.tags||{},pos=e=>e.center||e,dd=e=>pos(e).lat==null?1e9:dist(p,pos(e));
+ const rails=els.filter(e=>/^(abandoned|disused|razed)$/.test(tg(e).railway||'')),
+  rn=[...new Set(rails.map(e=>tg(e).name||tg(e).old_name).filter(Boolean))].slice(0,3);
+ if(rails.length)h+=`<p class="sub">Old railroad beds</p><p>${rails.length>1?'Several former rail lines':'A former rail line'} nearby${rn.length?': '+esc(rn.join(', ')):''}<small>nearest about ${arFd(Math.min(...rails.map(dd)),us)} away</small></p>`;
+ const gh=els.filter(e=>{const t=tg(e);return t['abandoned:place']||t['disused:place']||/^(ruins|mine|mill|archaeological_site)$/.test(t.historic||'')}).map(e=>({e,d:dd(e)})).sort((x,y)=>x.d-y.d),seenG=new Set(),gl=[];
+ for(const x of gh){const t=tg(x.e),k=(t.name||t['abandoned:place']||t['disused:place']||t.historic)+'|'+(t.historic||'');if(seenG.has(k))continue;seenG.add(k);gl.push(x)}
+ if(gl.length)h+=`<p class="sub">Ruins and abandoned places</p>`+gl.slice(0,6).map(x=>{const t=tg(x.e),what=t.historic?t.historic.replace(/_/g,' '):'abandoned '+(t['abandoned:place']||t['disused:place']);return`<p>${esc(t.name||'Unnamed')} <small>${esc(what)} · ${arFd(x.d,us)} away</small></p>`}).join('');
+ const cm=[...new Map(els.filter(e=>tg(e).name&&(tg(e).landuse==='cemetery'||tg(e).amenity==='grave_yard')).sort((x,y)=>dd(x)-dd(y)).map(e=>[tg(e).name,e])).values()].slice(0,5);
+ if(cm.length)h+=`<p class="sub">Cemeteries</p>`+cm.map(e=>`<p>${esc(tg(e).name)}<small>${arFd(dd(e),us)} away</small></p>`).join('');
+ const fm=els.filter(e=>/^(school|place_of_worship)$/.test(tg(e)['disused:amenity']||tg(e)['abandoned:amenity']||'')).sort((x,y)=>dd(x)-dd(y)).slice(0,4);
+ if(fm.length)h+=`<p class="sub">Former schools and churches</p>`+fm.map(e=>{const t=tg(e),k=(t['disused:amenity']||t['abandoned:amenity']).replace('place_of_worship','church');return`<p>${esc(t.name||'Unnamed '+k)}<small>former ${esc(k)} · ${arFd(dd(e),us)} away</small></p>`}).join('');
+ b.innerHTML=h||arNote('Nothing recorded close by. Old places are often missing from the map, so a walk may turn up more.')}
+
+/* build the cards under the story; each one loads the first time it is opened */
+function arAround(p){const box=$('ar');if(!box)return;
+ const C=[['paper','🗞 Old newspapers from here',async(p,b)=>{b.innerHTML='<div id="cc"></div><div id="nbm"></div><div id="nws"></div>';clip(p,$('cc'));nearby();await locate(p);arNews(p,$('nws'))}],['hist','📚 Local histories and books',arHist],['pic','🖼 Photos and maps',arPics],['nat','🦉 Wildlife nearby',arNat],['geo','🪨 Ground and water',arGeo],['wx','🌦 Weather then and now',arWx],['old','🏚 Hidden history',arOld],['who','🧑 Who and what was here',(p,b)=>more(b)]];
+ box.innerHTML='<h4>Around here</h4>'+C.map(c=>`<details data-k="${c[0]}"><summary>${c[1]}</summary><div class="bd"></div><button class="seg svb">＋ Save to journal</button></details>`).join('');
+ for(const d of box.querySelectorAll('details')){const c=C.find(x=>x[0]===d.dataset.k);
+  d.querySelector('.svb').onclick=e=>{const t=d.querySelector('.bd').innerText.replace(/\s+/g,' ').trim(),bt=e.target;if(!t||/^Looking/.test(t)){bt.textContent='Nothing to save yet';setTimeout(()=>{bt.textContent='＋ Save to journal'},2000);return}p.finds=p.finds||{};p.finds[c[1].replace(/^\S+\s/,'')]=t.slice(0,500);bt.textContent='Saved ✓ It will go in your next journal entry'};
+  d.addEventListener('toggle',()=>{if(!d.open||d.dataset.done)return;d.dataset.done='1';const b=d.querySelector('.bd');b.innerHTML=arNote('Looking…');
+   Promise.resolve().then(()=>c[2](p,b)).catch(()=>{b.innerHTML=arNote('That source did not answer. Close this card and open it again to retry.');d.dataset.done=''})})}}
+
+async function more(bx){
+ const p=dest,box=bx,cx=arCtx(p),place=cx.city||cx.county,wl=(n,tag)=>{const m=/^en:(.+)$/.exec(tag||'');return m?'https://en.wikipedia.org/wiki/'+encodeURIComponent(m[1].replace(/ /g,'_')):'https://en.wikipedia.org/w/index.php?search='+arEnc(n+' '+place)};
+ box.textContent='Looking back through the records…';
+ const sq=`SELECT ?pLabel ?b ?cLabel ?w WHERE{SERVICE wikibase:around{?c wdt:P625 ?l.bd:serviceParam wikibase:center "Point(${p.lon} ${p.lat})"^^geo:wktLiteral;wikibase:radius "20".}?p wdt:P19 ?c;wdt:P569 ?b.OPTIONAL{?w schema:about ?p;schema:isPartOf <https://en.wikipedia.org/>.}SERVICE wikibase:label{bd:serviceParam wikibase:language "en".}}LIMIT 8`;
+ const[o,w]=await Promise.all([arOvp(p),arJ('https://query.wikidata.org/sparql?format=json&query='+encodeURIComponent(sq))]);
+ const L1=[],seen=new Set();
+ for(const e of(o&&o.elements)||[]){const t=e.tags||{},c=e.center||e;if(c.lat==null||dist(p,c)>4000)continue;
+  if(t.old_name){const k='o'+t.old_name;if(!seen.has(k)){seen.add(k);L1.push(`<p>Once called ${arLink(wl(t.old_name,''),t.old_name)}${t.name?', now '+arLink(wl(t.name,t.wikipedia),t.name):''}.</p>`)}}
+  if(t.historic&&t.name&&!/^(ruins|mine|mill|archaeological_site)$/.test(t.historic)){const k='h'+t.name;if(!seen.has(k)){seen.add(k);const ins=t.inscription?String(t.inscription):'';L1.push(`<p><b>${arLink(wl(t.name,t.wikipedia),t.name)}</b> (${esc(t.historic.replace(/_/g,' '))})${ins?': '+esc(ins.length>160?ins.slice(0,157)+'…':ins):''}</p>`)}}}
+ for(const r of((w&&w.results&&w.results.bindings)||[])){const n=r.pLabel&&r.pLabel.value;if(!n||/^Q\d+$/.test(n)||seen.has('b'+n))continue;seen.add('b'+n);
+  const y=((r.b&&r.b.value||'').match(/-?\d{3,4}/)||[''])[0];L1.push(`<p>Born near here: ${arLink(r.w&&/^https:\/\/en\.wikipedia\.org\//.test(r.w.value)?r.w.value:'https://en.wikipedia.org/w/index.php?search='+arEnc(n),n)}${y?' ('+y.replace(/^-0*/,'')+(y[0]=='-'?' BCE':'')+')':''}${r.cLabel&&!/^Q\d+$/.test(r.cLabel.value)?', in '+esc(r.cLabel.value):''}.</p>`)}
+ box.innerHTML=L1.length?L1.slice(0,10).join(''):'<p>Nothing recorded close by. Try another spot.</p>'}
+
+/* ghost map: aged look and an optional tile overlay */
+const sv=()=>{try{localStorage.driftcfg=JSON.stringify(cfg)}catch(e){}};
+let ghost=null;
+function setGhost(){if(ghost){ghost.remove();ghost=null}
+ const t=cfg.gh||'',u=t=='usgs'?'https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}':t=='custom'?(cfg.ghu||''):'';
+ if(!u)return;
+ if(!/^https:\/\/.*\{z\}/.test(u)||!u.includes('{x}')||!u.includes('{y}')){say('Use an https tile address that has {z}, {x} and {y} in it.');return}
+ ghost=L.tileLayer(u,{opacity:(cfg.gho||60)/100,maxZoom:19,maxNativeZoom:t=='usgs'?16:19,attribution:t=='usgs'?'USGS The National Map':''}).addTo(map);
+ let bad=0;ghost.on('tileerror',()=>{if(++bad==6)say('That overlay is not loading here. It may not cover this area, or the source may be down.')})}
+$('agec').checked=!!cfg.aged;$('map').classList.toggle('aged',!!cfg.aged);
+$('agec').onchange=()=>{cfg.aged=$('agec').checked;$('map').classList.toggle('aged',cfg.aged);sv()};
+$('ghs').value=cfg.gh||'';$('ghu').value=cfg.ghu||'';$('gho').value=cfg.gho||60;$('ghov').textContent=$('gho').value+'%';$('ghu').style.display=cfg.gh=='custom'?'block':'none';
+$('ghs').onchange=()=>{cfg.gh=$('ghs').value;$('ghu').style.display=cfg.gh=='custom'?'block':'none';sv();setGhost()};
+$('ghu').onchange=()=>{cfg.ghu=$('ghu').value.trim();sv();setGhost()};
+$('gho').oninput=()=>{cfg.gho=+$('gho').value;$('ghov').textContent=cfg.gho+'%';if(ghost)ghost.setOpacity(cfg.gho/100);sv()};
+setGhost();
+
+/* seasonal accent color */
+function season(p){const m=new Date().getMonth(),n=(p?p.lat:1)>=0,i=Math.floor(((m+(n?0:6)+1)%12)/3);document.documentElement.style.setProperty('--brass',['#a9c4dc','#a9c98a','#e0b85a','#d18a4a'][i])}
+season();
+if(window.driftOffline)say('The map could not load, so places cannot be shown. Journal, sky and settings still work.',1);
+if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script></body></html>
