@@ -3,6 +3,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0a0e1f">
 <title>Drift</title>
+<!-- Drift roadmap update: Valhalla routing, intentional geolocation, IndexedDB journal mirror, safer import validation, metric units. -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=IM+Fell+English:ital@0;1&family=Caveat&display=swap" rel="stylesheet">
 <style>
@@ -125,6 +126,15 @@ select{width:100%;background:#0c1126;border:1px solid var(--line);border-radius:
 #hint{bottom:auto;top:12px}
 #around{display:none;flex:1;overflow:auto;padding:14px 16px}
 #around>#th>p{margin:0 0 10px}
+#journalSearch{margin:0 0 12px}
+.route-note{color:var(--brass);font-size:12px;margin-top:6px}
+button:disabled{cursor:wait;opacity:.55}
+@media(max-height:720px){#panel{max-height:48vh}}
+
+:focus-visible{outline:2px solid #e4bd72!important;outline-offset:3px}
+button,.seg,a,summary{touch-action:manipulation}
+button,.seg{min-height:42px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 </style></head><body>
 <header id="sky"><div id="stars"></div><h1>Drift</h1><button id="gear" aria-label="Settings">⚙</button><button id="skybtn">Sky</button><button id="mus" aria-label="Ambient music">♪</button><p id="m">Finding your sky</p><p id="s"></p><p id="w"></p><p id="x"></p><p id="tdl"></p><div id="skyx"><label for="tsl">Slide the sky through the next 24 hours: <b id="tsv">now</b></label><input type="range" id="tsl" min="0" max="96" value="0"><button class="seg" id="tnow" style="margin-top:6px;width:100%">Back to now</button></div></header>
 <nav><button id="t1" class="on">Explore</button><button id="t3">Around</button><button id="t2">Journal</button></nav>
@@ -133,7 +143,7 @@ select{width:100%;background:#0c1126;border:1px solid var(--line);border-radius:
  <p class="note">Land access can't be verified. Stay off private property.</p>
  <div id="result"><h2 id="rn"></h2><p id="rd"></p>
  <div class="row" style="margin:0 0 8px"><a class="go ghost" id="rmap" target="_blank" rel="noopener" style="flex:1;font-size:15px;padding:11px 4px">Directions</a><button class="go ghost" id="walk" style="flex:1;font-size:15px;padding:11px 4px">Start journey</button><button class="go" id="arr" style="flex:1;font-size:15px;padding:11px 4px">I’ve arrived</button></div>
-<div id="tr" style="display:none;text-align:center;margin-bottom:8px"><svg viewBox="0 0 100 100" width="150" height="150"><path d="M50 0L54 7H46Z" fill="#c9a96a"/><g id="rs1" style="transform-origin:50px 50px"><circle cx="50" cy="50" r="31" fill="none" stroke="#c9a96a" stroke-opacity=".5" stroke-dasharray="1 3"/><text x="50" y="16" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="#d18a4a">N</text><text x="50" y="92" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="#eadfc4">S</text><text x="90" y="54" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="#eadfc4">E</text><text x="10" y="54" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="#eadfc4">W</text><g id="nd" style="transform-origin:50px 50px"><path d="M50 21L57 52L50 47L43 52Z" fill="#c9a96a" stroke="#1a1405" stroke-width=".8"/></g></g></svg><p id="td" style="color:var(--dusk)"></p><p class="note" style="margin:0 0 8px">Gold arrow: your destination. N is true north.</p><button class="seg" id="paBtn" style="width:100%">Phone away</button></div>
+<p id="routeinfo" class="note" aria-live="polite"></p><div id="tr" style="display:none;text-align:center;margin-bottom:8px"><svg viewBox="0 0 100 100" width="150" height="150"><path d="M50 0L54 7H46Z" fill="#c9a96a"/><g id="rs1" style="transform-origin:50px 50px"><circle cx="50" cy="50" r="31" fill="none" stroke="#c9a96a" stroke-opacity=".5" stroke-dasharray="1 3"/><text x="50" y="16" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="#d18a4a">N</text><text x="50" y="92" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="#eadfc4">S</text><text x="90" y="54" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="#eadfc4">E</text><text x="10" y="54" text-anchor="middle" font-size="10" font-family="DM Sans,sans-serif" fill="#eadfc4">W</text><g id="nd" style="transform-origin:50px 50px"><path d="M50 21L57 52L50 47L43 52Z" fill="#c9a96a" stroke="#1a1405" stroke-width=".8"/></g></g></svg><p id="td" style="color:var(--dusk)"></p><p class="note" style="margin:0 0 8px">Gold arrow: your destination. N is true north.</p><button class="seg" id="paBtn" style="width:100%">Phone away</button></div>
 <button class="go ghost" id="goAr" style="font-size:15px;padding:11px">What’s around here →</button><div class="xtra"><button class="go ghost" id="seal" style="margin-top:8px;font-size:15px;padding:11px">Send as a sealed link</button></div></div>
 <div class="xtra">
  <div class="row"><button class="seg on" id="m1">Random</button><button class="seg" id="m2">Intention</button><button class="seg" id="m3">Dream</button></div>
@@ -160,12 +170,13 @@ select{width:100%;background:#0c1126;border:1px solid var(--line);border-radius:
  <label style="display:flex;gap:8px;align-items:center;margin-top:10px;color:var(--paper)"><input type="checkbox" id="cap" style="accent-color:#c9a96a"> Leave this note here for future me</label>
  <div class="row" style="margin:14px 0 0"><button class="go ghost" id="dc" style="flex:1;font-size:18px">Cancel</button><button class="go" id="ds" style="flex:1;font-size:18px">Save</button></div></dialog>
 <dialog id="sd"><h2 style="font-size:26px">Settings</h2>
- <label style="display:flex;gap:10px;align-items:flex-start;color:var(--paper);margin-top:12px"><input type="checkbox" id="safe" style="margin-top:4px;accent-color:#c9a96a"><span>Safe mode<br><span style="color:var(--dusk);font-size:13px">Keep spots on public roads, paths and park edges. Turn off to allow any point.</span></span></label>
+ <label style="display:flex;gap:10px;align-items:flex-start;color:var(--paper);margin-top:12px"><input type="checkbox" id="safe" style="margin-top:4px;accent-color:#c9a96a"><span>Safe mode<br><span style="color:var(--dusk);font-size:13px">Prefer mapped roads, paths and park edges. Map data cannot confirm legal access; check signs and local rules.</span></span></label>
  <label style="display:flex;gap:10px;align-items:flex-start;color:var(--paper);margin-top:12px"><input type="checkbox" id="fogc" style="margin-top:4px;accent-color:#c9a96a"><span>Fog of war<br><span style="color:var(--dusk);font-size:13px">Dim the map until you visit places. Each saved visit clears a circle.</span></span></label>
  <label style="display:flex;gap:10px;align-items:flex-start;color:var(--paper);margin-top:12px"><input type="checkbox" id="red" style="margin-top:4px;accent-color:#c9a96a"><span>Night vision<br><span style="color:var(--dusk);font-size:13px">A dim red look that keeps your eyes adjusted for stargazing.</span></span></label>
  <label style="display:flex;gap:10px;align-items:flex-start;color:var(--paper);margin-top:12px"><input type="checkbox" id="agec" style="margin-top:4px;accent-color:#c9a96a"><span>Aged map look<br><span style="color:var(--dusk);font-size:13px">Tints the map like an old paper atlas.</span></span></label>
  <label style="display:flex;gap:10px;align-items:flex-start;color:var(--paper);margin-top:12px"><input type="checkbox" id="usc" style="margin-top:4px;accent-color:#c9a96a"><span>U.S. only<br><span style="color:var(--dusk);font-size:13px">Only pick destinations inside the United States.</span></span></label>
- <label for="ghs" style="margin-top:12px">Ghost map overlay</label><select id="ghs"><option value="">None</option><option value="usgs">USGS topographic (US only)</option><option value="custom">Custom tile URL</option></select>
+ <label style="display:flex;gap:10px;align-items:flex-start;color:var(--paper);margin-top:12px"><input type="checkbox" id="metric" style="margin-top:4px;accent-color:#c9a96a"><span>Metric units<br><span style="color:var(--dusk);font-size:13px">Show kilometres, metres and Celsius instead of miles, feet and Fahrenheit.</span></span></label>
+  <label for="ghs" style="margin-top:12px">Ghost map overlay</label><select id="ghs"><option value="">None</option><option value="usgs">USGS topographic (US only)</option><option value="custom">Custom tile URL</option></select>
  <input type="text" id="ghu" placeholder="https://example.com/{z}/{x}/{y}.png" style="display:none;margin-top:6px">
  <label for="gho">Overlay strength: <b id="ghov"></b></label><input type="range" id="gho" min="10" max="100">
  <p class="note">Overlays are drawn over the base map. Pick one that covers where you are, or paste any https tile address with {z}, {x} and {y} in it.</p>
@@ -182,7 +193,7 @@ select{width:100%;background:#0c1126;border:1px solid var(--line);border-radius:
 <script>if(typeof L==="undefined"){window.L=(function(){const p=new Proxy(function(){},{get:(t,k)=>k===Symbol.toPrimitive?()=>0:p,apply:()=>p,construct:()=>p});return p})();window.driftOffline=1}</script>
 <script>
 const $=i=>document.getElementById(i),D=Math.PI/180;
-let origin=null,home=null,dest=null,mode=1;
+let origin=null,home=null,dest=null,mode=1,routeLayer=null,activeTripRoute=null,lastTripRouteAt=0,lastTripRouteStart=null,geoRequest=0;
 const map=L.map('map',{zoomControl:false}).setView([39,-98],4),pins=L.layerGroup().addTo(map);
 const MAP_KEY='';/* optional: paste a CARTO key here to use their dark tiles */
 L.tileLayer(MAP_KEY?'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key='+MAP_KEY:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'+(MAP_KEY?' © CARTO':''),maxZoom:19,className:MAP_KEY?'':'dk'}).addTo(map);
@@ -195,6 +206,27 @@ function seeded(a){return()=>{let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t
 function offset(o,d,b){const p=o.lat*D,l=o.lon*D,g=d/6371000,p2=Math.asin(Math.sin(p)*Math.cos(g)+Math.cos(p)*Math.sin(g)*Math.cos(b)),l2=l+Math.atan2(Math.sin(b)*Math.sin(g)*Math.cos(p),Math.cos(g)-Math.sin(p)*Math.sin(p2));return{lat:p2/D,lon:((l2/D+540)%360)-180}}
 function dist(a,b){return Math.hypot((b.lon-a.lon)*D*Math.cos((a.lat+b.lat)*D/2),(b.lat-a.lat)*D)*6371000}
 function bearing(a,b){const dl=(b.lon-a.lon)*D;return(Math.atan2(Math.sin(dl)*Math.cos(b.lat*D),Math.cos(a.lat*D)*Math.sin(b.lat*D)-Math.sin(a.lat*D)*Math.cos(b.lat*D)*Math.cos(dl))/D+360)%360}
+
+/* OpenStreetMap-based Valhalla routing: network distance, duration and route geometry. */
+const ROUTER='https://valhalla1.openstreetmap.de/route';
+function decodePolyline6(str){let i=0,lat=0,lon=0,out=[];while(i<str.length){let r=1,v=0,b;do{b=str.charCodeAt(i++)-63;v+=(b&31)*r;r*=32}while(b>=32);lat+=(v&1)?~(v>>1):(v>>1);r=1;v=0;do{b=str.charCodeAt(i++)-63;v+=(b&31)*r;r*=32}while(b>=32);lon+=(v&1)?~(v>>1):(v>>1);out.push([lon/1e6,lat/1e6])}return out}
+async function getRoute(a,b,modeIndex){
+ const costing=['pedestrian','bicycle','auto'][modeIndex]||'pedestrian',ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),10000);
+ try{
+  const res=await fetch(ROUTER,{method:'POST',headers:{'Content-Type':'application/json'},signal:ctrl.signal,body:JSON.stringify({locations:[{lat:a.lat,lon:a.lon},{lat:b.lat,lon:b.lon}],costing,units:cfg.metric?'km':'miles'})});
+  if(!res.ok)return{unavailable:true,status:res.status};
+  const j=await res.json(),trip=j.trip,leg=trip&&trip.legs&&trip.legs[0];
+  if(!trip||!leg||!trip.summary||j.error_code)return{noRoute:true,message:j.error||trip?.status_message||'No mapped route'};
+  let coords=leg.shape&&leg.shape.coordinates;if(!coords&&typeof leg.shape==='string')coords=decodePolyline6(leg.shape);
+  if(!Array.isArray(coords)||coords.length<2)return{unavailable:true,reason:'Missing route geometry'};
+  const start={lat:coords[0][1],lon:coords[0][0]},finish={lat:coords[coords.length-1][1],lon:coords[coords.length-1][0]};
+  const startSnap=dist(a,start),endSnap=dist(b,finish),maxEnd=modeIndex===2?800:500;
+  if(startSnap>1200||endSnap>maxEnd)return{noRoute:true,reason:'Destination is too far from a mapped route'};
+  return{ok:true,coordinates:coords.map(c=>[c[1],c[0]]),distance:trip.summary.length,seconds:trip.summary.time,minutes:Math.max(1,Math.round(trip.summary.time/60)),instructions:(leg.maneuvers||[]).map(m=>m.instruction).filter(Boolean),costing,startSnap,endSnap};
+ }catch(e){return{unavailable:true,reason:e&&e.name==='AbortError'?'Routing request timed out':'Routing service could not be reached'}}
+ finally{clearTimeout(timer)}
+}
+function routeDistanceLabel(r){return cfg.metric?r.distance.toFixed(r.distance<10?1:0)+' km':r.distance.toFixed(r.distance<10?1:0)+' miles'}
 const dirs=['north','northeast','east','southeast','south','southwest','west','northwest'];
 const A=['Quiet','Lantern','Hollow','Silver','Wandering','Amber','Still','Moss','Ember','Distant','Thistle','Gentle'],N=['Ridge','Creek','Orchard','Crossing','Meadow','Landing','Hollow','Overlook','Grove','Shore','Clearing','Bend'];
 
@@ -217,10 +249,10 @@ function paint(){const p=dest||origin;if(!p)return;const t=$('when').value?new D
 const miles=()=>.5*Math.pow(1000,$('rad').value/100);
 function rl(){const m=miles();$('rl').textContent=(m<10?m.toFixed(1):Math.round(m))+' miles'}
 $('rad').oninput=rl;rl();
-function setOrigin(p,keep){const moved=!!origin;origin=p;pick=0;$('mv').classList.remove('on');hint.style.display='none';capsules(p);season(p);if(home)home.remove();
+function setOrigin(p,keep){geoRequest++;const moved=!!origin;origin=p;pick=0;$('mv').classList.remove('on');hint.style.display='none';capsules(p);season(p);if(home)home.remove();
  home=L.marker([p.lat,p.lon],{draggable:true,icon:L.divIcon({className:'',html:'<div class="home"></div>',iconSize:[18,18],iconAnchor:[9,9]})}).addTo(map);
  home.on('dragend',()=>{const g=home.getLatLng();setOrigin({lat:g.lat,lon:g.lng},1)});
- if(moved&&wid==null){pins.clearLayers();dest=null;$('result').style.display='none'}
+ if(moved&&wid==null){pins.clearLayers();if(routeLayer){map.removeLayer(routeLayer);routeLayer=null}dest=null;$('result').style.display='none'}
  if(!keep)map.setView([p.lat,p.lon],12);paint();wx(p)}
 let pick=0;
 $('mv').onclick=()=>{pick=!pick;$('mv').classList.toggle('on',!!pick);if(pick)say('Tap the map to move your start, or drag the gold dot',1);else hint.style.display='none'};
@@ -230,8 +262,8 @@ async function findPlace(){const q=$('sq').value.trim();if(!q)return;
  const r=await arJ('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q='+encodeURIComponent(q),0,8000);
  if(r&&r[0]){setOrigin({lat:+r[0].lat,lon:+r[0].lon});say('Start moved to '+String(r[0].display_name).split(',').slice(0,2).join(','))}else say('Nothing found for that search.')}
 $('sg2').onclick=findPlace;$('sq').onkeydown=e=>{if(e.key==='Enter')findPlace()};
-if(navigator.geolocation)navigator.geolocation.getCurrentPosition(g=>setOrigin({lat:g.coords.latitude,lon:g.coords.longitude}),needStart,{timeout:10000});
-else needStart();
+// Location is requested only after the user taps “Use my location”.
+needStart();
 map.on('click',e=>{if(!origin||pick)setOrigin({lat:e.latlng.lat,lon:e.latlng.lng})});
 
 /* numbers */
@@ -416,41 +448,71 @@ async function spawn(){
  const txt=$('intent').value.trim();if(mode==2&&!txt){$('intent').focus();return}
  $('go').disabled=true;$('go').textContent='Searching';const hold=sigil(mode==2?txt:String(Date.now()));$('rmap').style.display='';$('walk').style.display='';
  const rng=mode==2?seeded(hash(txt+Date.now())):Math.random,Rm=miles()*1609.34,iw=mode==2?word(txt):0;let hit=null,raw;dkP=null;
- if(mode==3)hit=await dreamPoint();
+ if(mode==3){hit=await dreamPoint();if(!hit){say('Could not find a story-rich dream destination inside the selected area. Turn off U.S. only or try again.');return}}
  let rawOK=null;
  for(let i=0;i<(cfg.us?8:3)&&!hit&&mode!=3;i++){
   raw=kind==4?await darkRaw(origin,Rm,rng):pickRaw(origin,Rm,rng);
+  if(!raw)continue;
   if(cfg.safe){const sr=Math.min(5000,Math.max(500,Rm*.3)),c=(await roads(raw,sr)).filter(v=>dist(raw,v)<sr*1.2);if(c.length)hit=kind==4&&dkP&&dkP.length?c.reduce((a,b)=>dkVal(b)>dkVal(a)?b:a):best(c,iw,rng)}
   else hit=kind==4?raw:best(Array.from({length:300},()=>offset(raw,rng()*1500,rng()*6.2832)),iw,rng);
   if(cfg.us){if(await usOK(hit||raw)){if(!hit)rawOK=raw}else hit=null}}
  if(cfg.us&&!hit&&!rawOK){say('No U.S. spot found in that radius. Try a bigger radius, move your start, or turn off U.S. only in Settings.');return}
- dest=hit||rawOK||raw;dest.road=!!hit&&cfg.safe;arr=0;
+ dest=hit||rawOK||raw;if(!dest){say('No destination could be found. Try a wider radius or another mode.');return}dest.road=!!hit&&cfg.safe;arr=0;
+ let routed=null,routeUnavailable=false;
+ if(mode!==3){
+  say('Checking mapped routes…',1);
+  for(let attempt=0;attempt<3;attempt++){
+   routed=await getRoute(origin,dest,tm);
+   if(routed&&routed.ok)break;
+   if(!routed||routed.unavailable){routeUnavailable=true;break}
+   if(!routed.noRoute||attempt===2)break;
+   let candidate=kind==4?await darkRaw(origin,Rm,rng):pickRaw(origin,Rm,rng);if(!candidate)break;
+   if(cfg.safe){const sr=Math.min(5000,Math.max(500,Rm*.3)),choices=(await roads(candidate,sr)).filter(v=>dist(candidate,v)<sr*1.2);candidate=choices.length?(kind==4&&dkP&&dkP.length?choices.reduce((a,b)=>dkVal(b)>dkVal(a)?b:a):best(choices,iw,rng)):null}
+   if(!candidate)continue;
+   if(cfg.us&&!await usOK(candidate))continue;
+   dest=candidate;dest.road=!!cfg.safe;
+  }
+  if(routed&&routed.noRoute){say('Could not find a connected mapped route after three tries. Try a wider radius, another travel mode, or move your start.');return}
+  if(routeUnavailable)routed=null;
+ }
+ dest.route=routed;
  const T=await threads(dest),k=T.nt.k,place=T.pg?T.pg.title:(dest.name||dest.town);
  dest.title=EP[k]+(place?' near '+place:' '+(T.nt.a||k));
  const d=dist(origin,dest),b=bearing(origin,dest),ao=dest.lon>0?dest.lon-180:dest.lon+180;
  await hold;$('sg').style.display='none';
  pins.clearLayers();
  const ring=L.circle([origin.lat,origin.lon],{radius:Rm,color:'#c9a96a',weight:1,fillOpacity:.03,dashArray:'2 6'});if(mode!=3)ring.addTo(pins);
- L.polyline([[origin.lat,origin.lon],[dest.lat,dest.lon]],{color:'#c9a96a',weight:1.5,dashArray:'4 6'}).addTo(pins);
+ if(routeLayer){map.removeLayer(routeLayer);routeLayer=null}routeLayer=L.polyline(routed?routed.coordinates:[[origin.lat,origin.lon],[dest.lat,dest.lon]],{color:'#c9a96a',weight:3,opacity:.9,dashArray:routed?null:'4 6'}).addTo(map);
  L.marker([dest.lat,dest.lon],{icon:L.divIcon({className:'',html:'<div class="star'+(T.nt.a&&T.pg&&(!iw||T.nt.k==iw%10)?' gold':'')+'">✦</div>',iconSize:[28,28],iconAnchor:[14,14]})}).addTo(pins);
- if(mode==3)map.setView([dest.lat,dest.lon],7);else map.fitBounds(ring.getBounds());
- $('rn').textContent=dest.title;
- $('rd').textContent=(d/1609.34).toFixed(d<16093?1:0)+' miles '+dirs[Math.round(b/45)%8]+(cfg.safe?(dest.road?', on a public road, path or park edge':'. No public road or path found nearby, so check access before going.'):'. Safe mode is off, so check access before going.');
+ if(mode==3)map.setView([dest.lat,dest.lon],7);else map.fitBounds(routeLayer.getBounds().pad(.12),{maxZoom:14});
+ $('rn').textContent=dest.title;$('routeinfo').textContent=routed?`${routeDistanceLabel(routed)} · ${routed.minutes} min ${TW[tm]} · route snapped to mapped network`:'No live route available. The dotted line is a straight-line reference only.';
+ $('rd').textContent=(routed?routeDistanceLabel(routed):(cfg.metric?(d/1000).toFixed(d<10000?1:0)+' km straight-line':(d/1609.34).toFixed(d<16093?1:0)+' miles straight-line'))+' '+dirs[Math.round(b/45)%8]+(cfg.safe?(dest.road?', near a mapped road, path or park edge. Public access is not verified.':'. Routing found a nearby network connection, but legal access is unverified; check signs and local rules.'):'. Safe mode is off, so check access before going.');
+ $('rd').insertAdjacentHTML('beforeend',routed?`<p class="route-note">${routed.minutes} min ${TW[tm]} · OpenStreetMap / Valhalla</p>`:'<p class="route-note">Route service unavailable; straight-line distance only. Check directions before leaving.</p>');
  $('th').innerHTML=`<p>${iw?`Your words add up to ${iw}. `:''}${esc(T.nt.line)}</p>`+(T.pg?`<p><b>A story from nearby:</b> ${esc(T.pg.extract||T.pg.title)} <a href="https://en.wikipedia.org/?curid=${T.pg.pageid}" target="_blank" rel="noopener">Wikipedia</a></p>`:'')+`<p>Straight through the Earth: <a href="https://www.openstreetmap.org/?mlat=${-dest.lat}&mlon=${ao}#map=4/${-dest.lat}/${ao}" target="_blank" rel="noopener">the other side</a></p><div id="ar"></div>`;
- try{arAround(dest)}catch(e){}if(mode!=3){if(kind==4)darkNote();goldenLine(d)}
+ try{arAround(dest)}catch(e){}if(mode!=3){if(kind==4)darkNote();goldenLine(d,routed&&routed.seconds)}
  if(T.nt.a&&T.pg&&(!iw||T.nt.k==iw%10))$('th').insertAdjacentHTML('afterbegin','<p><b>Alignment.</b> '+(iw?'Your words, ':'')+'an angel number and a local story all line up here.</p>');
- $('rmap').href=`https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lon}`;
- if(mode==3){$('rd').textContent='An armchair visit, no travel needed. It is '+Math.round(d/1609.34).toLocaleString()+' miles from you.';$('rmap').style.display='none';$('walk').style.display='none'}
+ $('rmap').href=`https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lon}&destination=${dest.lat},${dest.lon}&travelmode=${['walking','bicycling','driving'][tm]}`;
+ if(mode==3){$('rd').textContent='An armchair visit, no travel needed. It is '+(cfg.metric?(d/1000).toFixed(1)+' km':(d/1609.34).toFixed(1)+' miles')+' from your starting point.';$('rmap').style.display='none';$('walk').style.display='none'}
  $('result').style.display='block';paint();wx(dest);
  $('go').disabled=false;$('go').textContent='Find another'}
 $('go').onclick=async()=>{try{await spawn()}catch(e){say('Something went wrong: '+(e&&e.message||e))}finally{$('sg').style.display='none';$('go').disabled=false;if($('go').textContent==='Searching')$('go').textContent='Find a place'}};
-$('loc').onclick=()=>navigator.geolocation?navigator.geolocation.getCurrentPosition(g=>setOrigin({lat:g.coords.latitude,lon:g.coords.longitude}),needStart,{timeout:10000}):needStart();
+$('loc').onclick=()=>{if(!navigator.geolocation){needStart();return}const req=++geoRequest;say('Waiting for your location…',1);navigator.geolocation.getCurrentPosition(g=>{if(req===geoRequest)setOrigin({lat:g.coords.latitude,lon:g.coords.longitude})},()=>{if(req===geoRequest)needStart()},{timeout:12000,maximumAge:60000})};
 
 /* journal */
-const load=()=>{try{return JSON.parse(localStorage.drift||'[]')}catch(e){return[]}};
-function save(a){try{localStorage.drift=JSON.stringify(a);return true}catch(e){return false}}
+let journalCache=(()=>{try{const a=JSON.parse(localStorage.drift||'[]');return Array.isArray(a)?a:[]}catch(e){return[]}})(),journalDb=null;
+function openJournalDb(){if(!('indexedDB'in window))return Promise.resolve(null);return new Promise(resolve=>{try{const q=indexedDB.open('DriftJournal',1);q.onupgradeneeded=()=>{if(!q.result.objectStoreNames.contains('journal'))q.result.createObjectStore('journal')};q.onsuccess=()=>{journalDb=q.result;resolve(journalDb)};q.onerror=()=>resolve(null)}catch(e){resolve(null)}})}
+function idbJournal(mode,value){return openJournalDb().then(db=>new Promise(resolve=>{if(!db)return resolve(false);try{const tx=db.transaction('journal','readwrite');if(mode==='put')tx.objectStore('journal').put({saved:Date.now(),entries:value},'main');else{const r=tx.objectStore('journal').get('main');r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>resolve(null);return}tx.oncomplete=()=>resolve(true);tx.onerror=()=>resolve(false)}catch(e){resolve(false)}}))}
+const load=()=>journalCache;
+function save(a){journalCache=Array.isArray(a)?a:[];let ok=false;try{localStorage.drift=JSON.stringify(journalCache);localStorage.setItem('driftSavedAt',String(Date.now()));ok=true}catch(e){}idbJournal('put',journalCache).then(saved=>{if(!ok&&!saved)say('Your device storage is full. Export your journal before adding more media.',1)});return true}
+openJournalDb().then(db=>{if(!db)return;idbJournal('get').then(v=>{if(v&&Array.isArray(v.entries)&&(!journalCache.length||v.saved>Date.parse(localStorage.getItem('driftSavedAt')||0))){journalCache=v.entries;try{localStorage.drift=JSON.stringify(journalCache)}catch(e){}if($('journal').style.display==='block')renderJ();fog()}})});
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-function renderJ0(){const a=load();$('journal').innerHTML=a.length?a.map(e=>`<div class="entry"><h2>${esc(e.name)}</h2><small>${new Date(e.t).toLocaleDateString()}, ${e.moon}</small>${e.sky?`<small>${esc(e.sky)}</small>`:''}${e.lat!=null?`<small>${e.lat.toFixed(4)}, ${e.lon.toFixed(4)}</small>`:''}${e.pic?`<div class="ph"><img alt="" src="${e.pic}"></div>`:''}<p>${esc(e.note)}</p>${e.snd?`<audio controls src="${e.snd}" style="width:100%"></audio>`:''}${e.sk?`<img alt="" src="${e.sk}" style="border:0;box-shadow:none;background:#1a2147;margin:6px 0">`:''}${e.item?'<small>Collected: '+ico(e.item)+' '+esc(e.item)+'</small>':''}${(e.finds||[]).map(f=>`<small><b>${esc(f.k)}:</b> ${esc(f.t)}</small>`).join('')}${e.cap?'<small>Time capsule</small>':''}<small><a href="#" data-d="${e.id}">Delete</a></small></div>`).reverse().join(''):'<p style="color:var(--dusk);text-align:center;margin-top:40px">Your journal is empty.<br>Find a place and mark it as visited.</p>'}
+let journalQuery='';
+function renderJ0(){
+ const all=load().filter(e=>e&&typeof e==='object'&&typeof e.name==='string'),q=journalQuery.trim().toLowerCase();
+ const a=q?all.filter(e=>[e.name,e.note,e.item,e.moon,e.sky,e.town,...(Array.isArray(e.finds)?e.finds.flatMap(f=>[f&&f.k,f&&f.t]):[])].join(' ').toLowerCase().includes(q)):all;
+ const holder=$('journalEntries');if(!holder)return;
+ holder.innerHTML=a.length?a.map(e=>`<div class="entry"><h2>${esc(e.name)}</h2><small>${new Date(Number(e.t)||Date.now()).toLocaleDateString()}, ${esc(e.moon||'')}</small>${e.sky?`<small>${esc(e.sky)}</small>`:''}${Number.isFinite(Number(e.lat))&&Number.isFinite(Number(e.lon))?`<small>${Number(e.lat).toFixed(4)}, ${Number(e.lon).toFixed(4)}</small>`:''}${e.pic?`<div class="ph"><img alt="Journal photo" loading="lazy" src="${e.pic}"></div>`:''}<p>${esc(e.note||'')}</p>${e.snd?`<audio controls preload="none" src="${e.snd}" style="width:100%"></audio>`:''}${e.sk?`<img alt="Journal sketch" loading="lazy" src="${e.sk}" style="border:0;box-shadow:none;background:#1a2147;margin:6px 0">`:''}${e.item?'<small>Collected: '+ico(e.item)+' '+esc(e.item)+'</small>':''}${(Array.isArray(e.finds)?e.finds:[]).filter(f=>f&&typeof f==='object').map(f=>`<small><b>${esc(f.k)}:</b> ${esc(f.t)}</small>`).join('')}${e.cap?'<small>Time capsule</small>':''}<small><a href="#" data-d="${esc(e.id)}">Delete</a></small></div>`).reverse().join(''):`<p style="color:var(--dusk);text-align:center;margin-top:40px">${q?'No journal entries match that search.':'Your journal is empty. Find a place and mark it as visited.'}</p>`;
+}
 $('journal').onclick=e=>{const id=e.target.dataset&&e.target.dataset.d;if(id){e.preventDefault();if(confirm('Delete this entry?')){save(load().filter(x=>String(x.id)!==id));renderJ()}}};
 function shrink(f){return new Promise(r=>{const i=new Image(),u=URL.createObjectURL(f);i.onerror=()=>{URL.revokeObjectURL(u);r('')};i.onload=()=>{URL.revokeObjectURL(u);const s=Math.min(1,700/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=i.width*s;c.height=i.height*s;c.getContext('2d').drawImage(i,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',.7))};i.src=u})}
 function tab(n){for(let i=1;i<4;i++)$('t'+i).classList.toggle('on',n==i);for(const i of['map','panel'])$(i).style.display=n==1?'':'none';$('around').style.display=n==3?'block':'none';$('journal').style.display=n==2?'block':'none';if(n==1){fog();setTimeout(()=>map.invalidateSize(),50)}else if(n==2)renderJ()}
@@ -471,14 +533,14 @@ $('ds').onclick=async()=>{const f=$('pic').files[0],e={id:Date.now(),t:Date.now(
 
 /* settings */
 const cfg=(()=>{try{return Object.assign({safe:true,fog:true},JSON.parse(localStorage.driftcfg||'{}'))}catch(e){return{safe:true,fog:true}}})();
-$('safe').checked=cfg.safe;
+$('safe').checked=cfg.safe;$('metric').checked=!!cfg.metric;const refreshRadiusLabel=()=>{const m=miles();$('rl').textContent=cfg.metric?(m*1.609344).toFixed(m<10?1:0)+' km':(m<10?m.toFixed(1):Math.round(m))+' miles'};$('rad').oninput=refreshRadiusLabel;refreshRadiusLabel();$('metric').onchange=()=>{cfg.metric=$('metric').checked;sv();if(dest&&dest.route){say('Units changed. Find a new place to refresh its route label.')} };
 $('safe').onchange=()=>{cfg.safe=$('safe').checked;sv()};
 $('usc').checked=!!cfg.us;$('usc').onchange=()=>{cfg.us=$('usc').checked;sv()};
 $('gear').onclick=()=>$('sd').showModal();$('sx').onclick=()=>$('sd').close();
 
 /* weather and local time */
-async function wx(p){aurora(p);tide(p);try{const j=await(await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&current=temperature_2m,weather_code&temperature_unit=fahrenheit&timezone=auto`)).json(),c=j.current.weather_code;if(p!==(dest||origin))return;
- tzh=j.utc_offset_seconds/3600;$('w').textContent=(c==0?'Clear':c<4?'Partly cloudy':c<50?'Fog':c<68?'Rain':c<78?'Snow':c<83?'Showers':c<87?'Snow showers':'Thunderstorms')+', '+Math.round(j.current.temperature_2m)+'°F';
+async function wx(p){aurora(p);tide(p);try{const j=await arJ(`https://api.open-meteo.com/v1/forecast?latitude=${p.lat}&longitude=${p.lon}&current=temperature_2m,weather_code&temperature_unit=${cfg.metric?'celsius':'fahrenheit'}&timezone=auto`,null,9000),c=j&&j.current&&j.current.weather_code;if(!j||!j.current||p!==(dest||origin))return;
+ tzh=j.utc_offset_seconds/3600;$('w').textContent=(c==0?'Clear':c<4?'Partly cloudy':c<50?'Fog':c<68?'Rain':c<78?'Snow':c<83?'Showers':c<87?'Snow showers':'Thunderstorms')+', '+Math.round(j.current.temperature_2m)+'°'+(cfg.metric?'C':'F');
  $('sky').classList.toggle('rain',(c>=51&&c<=67)||(c>=80&&c<=82)||c>=95);paint()}catch(e){}}
 
 /* fog of war: places you have visited clear a circle on the map */
@@ -496,18 +558,24 @@ async function trip(){
  if(wid!=null){navigator.geolocation.clearWatch(wid);wid=null;$('tr').style.display='none';$('walk').textContent='Start journey';return}
  try{if(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission)await DeviceOrientationEvent.requestPermission()}catch(e){}
  if(!lstn){lstn=1;addEventListener('deviceorientationabsolute',o=>{if(o.alpha!=null){hd=360-o.alpha;aim()}},true);addEventListener('deviceorientation',o=>{if(o.webkitCompassHeading!=null){hd=o.webkitCompassHeading;aim()}},true)}
- arr=0;$('tr').style.display='block';$('walk').textContent='Stop journey';$('td').textContent='Waiting for your location';
- wid=navigator.geolocation.watchPosition(g=>{const me={lat:g.coords.latitude,lon:g.coords.longitude},d=dist(me,dest);lastB=bearing(me,dest);aim();
-  $('td').textContent=$('td2').textContent=(d<500?Math.round(d*3.281)+' feet':(d/1609.34).toFixed(1)+' miles')+' away, about '+Math.max(1,Math.round(d/1609.34/SPD[tm]*60))+' minutes '+TW[tm];
+ arr=0;activeTripRoute=null;lastTripRouteAt=0;lastTripRouteStart=null;$('tr').style.display='block';$('walk').textContent='Stop journey';$('td').textContent='Waiting for your location';
+ wid=navigator.geolocation.watchPosition(async g=>{const me={lat:g.coords.latitude,lon:g.coords.longitude},d=dist(me,dest);lastB=bearing(me,dest);aim();
+  if(!activeTripRoute||Date.now()-lastTripRouteAt>60000||!lastTripRouteStart||dist(me,lastTripRouteStart)>500){lastTripRouteAt=Date.now();lastTripRouteStart=me;try{activeTripRoute=await getRoute(me,dest,tm);if(activeTripRoute&&activeTripRoute.ok){if(routeLayer)map.removeLayer(routeLayer);routeLayer=L.polyline(activeTripRoute.coordinates,{color:'#e4bd72',weight:4,opacity:.9}).addTo(map)}}catch(e){activeTripRoute=null}}
+  const rem=activeTripRoute?activeTripRoute.distance:(d/1609.34),unit=cfg.metric?' km':' miles',remaining=cfg.metric?(activeTripRoute?activeTripRoute.distance:d/1000):rem,eta=activeTripRoute?activeTripRoute.minutes:Math.max(1,Math.round(d/1609.34/SPD[tm]*60));
+  $('td').textContent=$('td2').textContent=(cfg.metric?(d<500?Math.round(d)+' m':(d/1000).toFixed(1)+' km'):(d<500?Math.round(d*3.281)+' feet':(d/1609.34).toFixed(1)+' miles'))+' away · '+(activeTripRoute?'route ':'rough estimate ')+Math.max(1,Math.round(eta))+' min';
   if(d<60)arrive()},()=>{$('td').textContent='Location unavailable'},{enableHighAccuracy:true})}
 $('walk').onclick=trip;$('oc').onclick=()=>{$('ov').style.display='none'};$('ow').onclick=()=>{$('ov').style.display='none';skipV=1;$('arr').click();skipV=0};
 
 /* journal tools */
 function exportJ(){const u=URL.createObjectURL(new Blob([JSON.stringify(load())],{type:'application/json'})),l=document.createElement('a');l.href=u;l.download='drift-journal-'+new Date().toISOString().slice(0,10)+'.json';l.click();setTimeout(()=>URL.revokeObjectURL(u),4000)}
-async function importJ(){const f=$('imf').files[0];if(!f)return;try{const a=JSON.parse(await f.text());if(!Array.isArray(a))throw 0;const cur=load(),ids=new Set(cur.map(e=>String(e.id))),add=a.filter(e=>e&&e.id!=null&&!ids.has(String(e.id)));if(!save(cur.concat(add)))alert('Storage is full, so nothing was imported.');else alert(add.length+' entries added.');renderJ()}catch(e){alert('That file is not a Drift journal.')}}
-function renderJ(){renderJ0();$('journal').insertAdjacentHTML('afterbegin','<div class="row"><button class="seg" id="lg">Log a coincidence</button><button class="seg" id="pr">Print journal</button><button class="seg" id="cs">Your stars</button><button class="seg" id="ap">Atlas poster</button></div><div class="row"><button class="seg" id="ex">Export journal</button><button class="seg" id="im">Import journal</button><input type="file" id="imf" accept="application/json,.json" style="display:none"></div>'+logbook());
+async function importJ(){const f=$('imf').files[0];if(!f)return;try{if(f.size>25*1024*1024)throw new Error('The file is larger than 25 MB.');const a=JSON.parse(await f.text());if(!Array.isArray(a)||a.length>5000)throw new Error('The journal format or entry count is invalid.');const valid=a.filter(e=>e&&typeof e==='object'&&!Array.isArray(e)&&e.id!=null&&Number.isFinite(Number(e.t))&&typeof e.name==='string'&&typeof e.note==='string'&&(e.lat==null||Number.isFinite(Number(e.lat))&&Math.abs(Number(e.lat))<=90)&&(e.lon==null||Number.isFinite(Number(e.lon))&&Math.abs(Number(e.lon))<=180)&&(!e.finds||Array.isArray(e.finds)));if(!valid.length&&a.length)throw new Error('No valid journal entries were found.');const media=(v,re)=>typeof v==='string'&&v.length<8e6&&re.test(v)?v:'',cur=load(),ids=new Set(cur.map(e=>String(e.id))),add=valid.filter(e=>!ids.has(String(e.id))).map(e=>({id:String(e.id),t:Number(e.t),name:e.name.slice(0,200),note:e.note.slice(0,12000),moon:String(e.moon||''),sky:String(e.sky||''),lat:e.lat==null?null:Number(e.lat),lon:e.lon==null?null:Number(e.lon),pic:media(e.pic,/^data:image\/(jpeg|png|webp);base64,/),snd:media(e.snd,/^data:audio\/(webm|mp4|ogg|wav);base64,/),sk:media(e.sk,/^data:image\/(png|jpeg|webp);base64,/),item:String(e.item||'').slice(0,200),finds:(e.finds||[]).filter(x=>x&&typeof x==='object').slice(0,30).map(x=>({k:String(x.k||'').slice(0,100),t:String(x.t||'').slice(0,1000)})),cap:!!e.cap}));if(!save(cur.concat(add)))alert('Storage is full, so nothing was imported. Export your journal and free some space first.');else alert(add.length+' valid entries added. '+(a.length-valid.length?`${a.length-valid.length} invalid entries skipped.`:''));renderJ()}catch(e){alert('Could not import journal: '+(e.message||'invalid file'))}}
+function renderJ(){
+ $('journal').innerHTML='<label for="jsearch">Search your journal</label><input type="search" id="jsearch" aria-label="Search journal" placeholder="Search notes, places, collected items…" value="'+esc(journalQuery)+'" style="margin-bottom:10px"><div id="journalEntries"></div><div class="row" id="journalActions"><button class="seg" id="lg">Log a coincidence</button><button class="seg" id="pr">Print journal</button><button class="seg" id="cs">Your stars</button><button class="seg" id="ap">Atlas poster</button></div><div class="row"><button class="seg" id="ex">Export journal</button><button class="seg" id="im">Import journal</button><input type="file" id="imf" accept="application/json,.json" style="display:none"></div>'+logbook();
+ renderJ0();
  $('lg').onclick=()=>{const n=prompt('What happened?');if(!n)return;const a=load();a.push({id:Date.now(),t:Date.now(),name:'A coincidence',sync:1,lat:dest?dest.lat:null,lon:dest?dest.lon:null,moon:moon(Date.now()),note:n,pic:''});save(a);renderJ()};
- $('pr').onclick=()=>print();$('cs').onclick=()=>{$('cstd').showModal();stars()};$('ap').onclick=poster;$('ex').onclick=exportJ;$('im').onclick=()=>$('imf').click();$('imf').onchange=importJ}
+ $('pr').onclick=()=>print();$('cs').onclick=()=>{$('cstd').showModal();stars()};$('ap').onclick=poster;$('ex').onclick=exportJ;$('im').onclick=()=>$('imf').click();$('imf').onchange=importJ;
+}
+$('journal').oninput=e=>{if(e.target&&e.target.id==='jsearch'){journalQuery=e.target.value;renderJ0()}};
 $('red').checked=!!cfg.red;document.body.classList.toggle('red',!!cfg.red);
 $('red').onchange=()=>{cfg.red=$('red').checked;document.body.classList.toggle('red',cfg.red);sv()};
 
@@ -633,9 +701,9 @@ $('skc').onclick=()=>{skx.clearRect(0,0,320,180);skd=0};
 
 /* getting there, and when to leave */
 const SPD=[3,10,35],TW=['on foot','by bike','by car'];let tm=0;
-function setTm(i){tm=i;for(let j=0;j<3;j++)$('tm'+j).classList.toggle('on',j==i)}
+function setTm(i){tm=i;for(let j=0;j<3;j++)$('tm'+j).classList.toggle('on',j==i);if(dest){if(routeLayer){map.removeLayer(routeLayer);routeLayer=null}routeLayer=L.polyline([[origin.lat,origin.lon],[dest.lat,dest.lon]],{color:'#c9a96a',weight:1.5,dashArray:'4 6',opacity:.65}).addTo(map);$('routeinfo').textContent='Travel mode changed. Find the place again to calculate a route for this mode.';$('rmap').href=`https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lon}&destination=${dest.lat},${dest.lon}&travelmode=${['walking','bicycling','driving'][tm]}`}}
 for(let i=0;i<3;i++)$('tm'+i).onclick=()=>setTm(i);
-function goldenLine(d){const t0=$('when').value?new Date($('when').value).getTime():Date.now(),mins=d/1609.34/SPD[tm]*60,ev=sunEvents(t0,dest.lat,dest.lon)[0];let h=`About ${Math.max(1,Math.round(mins))} minutes ${TW[tm]}.`;
+function goldenLine(d,routeSeconds){const t0=$('when').value?new Date($('when').value).getTime():Date.now(),mins=routeSeconds?routeSeconds/60:d/1609.34/SPD[tm]*60,ev=sunEvents(t0,dest.lat,dest.lon)[0];let h=`About ${Math.max(1,Math.round(mins))} minutes ${TW[tm]}${routeSeconds?' by mapped route':' (rough straight-line estimate)'}.`;
  if(ev&&mins<720){const lv=ev[1]-mins*6e4;h+=lv>t0?` Leave by ${hhmm(lv,dest.lon)} to arrive at ${ev[0]} (${hhmm(ev[1],dest.lon)}).`:` The next ${ev[0]} comes before you could arrive.`}
  $('rd').insertAdjacentHTML('beforeend','<br>'+h)}
 
@@ -645,7 +713,7 @@ const ICO=[['leaf','🍃'],['feather','🪶'],['stone','🪨'],['rock','🪨'],[
 const ico=t=>{t=t.toLowerCase();for(const[k,v]of ICO)if(t.includes(k))return v;return'✦'};
 function logbook(){const all=load(),a=all.filter(e=>!e.sync&&e.lat!=null),n=a.length,mi=a.reduce((x,e)=>x+(e.mi||0),0),sy=all.filter(e=>e.sync).length,it=all.filter(e=>e.item),
  ti=n>=25?'Keeper of Maps':n>=10?'Cartographer':n>=5?'Pathfinder':n>=1?'Wanderer':'Newcomer';
- return`<div class="entry" style="background:#1a2147;color:var(--paper)"><h2>${ti}</h2><small style="color:var(--dusk)">${n} places, ${Math.round(mi)} miles, ${sy} coincidences logged</small>${it.length?'<p style="font-family:inherit;font-size:15px">Collected: '+it.map(e=>ico(e.item)+' '+esc(e.item)).join(', ')+'</p>':''}</div>`}
+ return`<div class="entry" style="background:#1a2147;color:var(--paper)"><h2>${ti}</h2><small style="color:var(--dusk)">${n} places, ${Math.round(cfg.metric?mi*1.609344:mi)} ${cfg.metric?'km':'miles'}, ${sy} coincidences logged</small>${it.length?'<p style="font-family:inherit;font-size:15px">Collected: '+it.map(e=>ico(e.item)+' '+esc(e.item)).join(', ')+'</p>':''}</div>`}
 function stars(cv){cv=cv||$('cv');const a=load().filter(e=>!e.sync&&e.lat!=null).sort((x,y)=>x.t-y.t),x=cv.getContext('2d'),W=320;x.clearRect(0,0,W,W);x.fillStyle='#04060f';x.fillRect(0,0,W,W);
  for(let i=0;i<60;i++){x.fillStyle='#ffffff55';x.fillRect(Math.random()*W,Math.random()*W,1,1)}
  if(!a.length){$('cvn').textContent='Your constellation begins with your first saved place.';return}
@@ -669,9 +737,9 @@ let wl=null;
 $('paBtn').onclick=async()=>{$('pa').style.display='flex';try{wl=await navigator.wakeLock.request('screen')}catch(e){}};
 $('pa').onclick=()=>{$('pa').style.display='none';try{wl&&wl.release()}catch(e){}};
 
-/* sealed links: coordinates only, revealed in the app when the receiver arrives */
+/* Sealed links are obfuscated, not encrypted: coordinates are encoded in the URL fragment. */
 $('seal').onclick=async()=>{if(!/^https?:$/.test(location.protocol)){say('Sealed links only work once the app is hosted online, for example on GitHub Pages.');return}const u=location.href.split('#')[0]+'#m='+btoa(JSON.stringify([+dest.lat.toFixed(5),+dest.lon.toFixed(5)]));
- try{await navigator.clipboard.writeText(u);say('Sealed link copied. Send it to someone.')}catch(e){prompt('Copy this sealed link:',u)}};
+ try{await navigator.clipboard.writeText(u);say('Sealed link copied. Coordinates are encoded, not encrypted; only share with someone you trust.')}catch(e){prompt('Copy this sealed link:',u)}};
 let swid=null;
 function openSeal(t){$('sl').showModal();$('sh').textContent='Waiting for your location';$('sr').style.display='none';openSeal.p=null;
  swid=navigator.geolocation&&navigator.geolocation.watchPosition(async g=>{const me={lat:g.coords.latitude,lon:g.coords.longitude},d=dist(me,t);
@@ -786,9 +854,9 @@ $('aps').onclick=()=>$('apc').toBlob(async b=>{const f=new File([b],'drift-atlas
 
 /* ===== Around here: extra cards about the place, each loaded when opened ===== */
 var arOvm;
-function arJ(u,o,ms){return fetch(u,Object.assign({signal:AbortSignal.timeout?AbortSignal.timeout(ms||12000):undefined},o||{})).then(r=>r.ok?r.json():null).catch(()=>null)}
+function arJ(u,o,ms){const c=new AbortController(),t=setTimeout(()=>c.abort(),ms||12000);return fetch(u,Object.assign({},o||{},{signal:c.signal})).then(r=>r.ok?r.json():null).catch(()=>null).finally(()=>clearTimeout(t))}
 function arCtx(p){const l=p.loc||{},cc=String(l.cc||'').toLowerCase();return{city:cleanT(l.city||p.town||''),county:String(l.county||'').replace(/\s+(County|Parish|Borough)$/i,'').trim(),state:String(l.state||''),cc,us:cc==='us'}}
-function arFd(m){return(m/1609.34).toFixed(1)+' mi'}
+function arFd(m){return cfg.metric?(m/1000).toFixed(1)+' km':(m/1609.34).toFixed(1)+' mi'}
 function arLink(u,t){return`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`}
 function arEnc(s){return encodeURIComponent(s)}
 function arNote(h){return`<p class="note">${h}</p>`}
@@ -875,7 +943,7 @@ async function arGeo(p,b){await locate(p);const us=arCtx(p).us,
  b.innerHTML=h||arNote('No ground or water details were found here.')}
 
 /* weather today and on this date in past years (Open-Meteo) */
-async function arWx(p,b){const us=true,now=new Date(),md=String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0'),md2=md==='02-29'?'02-28':md,
+async function arWx(p,b){const us=!cfg.metric,now=new Date(),md=String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0'),md2=md==='02-29'?'02-28':md,
  q=`daily=temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum&timezone=auto&temperature_unit=${us?'fahrenheit':'celsius'}&precipitation_unit=${us?'inch':'mm'}`,yrs=[1950,1975,2000],la=p.lat.toFixed(3),lo=p.lon.toFixed(3);
  const[t,...hh]=await Promise.all([arJ(`https://api.open-meteo.com/v1/forecast?latitude=${la}&longitude=${lo}&${q}&forecast_days=1`),...yrs.map(y=>arJ(`https://archive-api.open-meteo.com/v1/archive?latitude=${la}&longitude=${lo}&start_date=${y}-${md2}&end_date=${y}-${md2}&${q}`))]);
  if(!t&&hh.every(x=>!x))throw 0;
