@@ -193,6 +193,42 @@ button,.seg{min-height:42px}
 <script>if(typeof L==="undefined"){window.L=(function(){const p=new Proxy(function(){},{get:(t,k)=>k===Symbol.toPrimitive?()=>0:p,apply:()=>p,construct:()=>p});return p})();window.driftOffline=1}</script>
 <script>
 const $=i=>document.getElementById(i),D=Math.PI/180;
+/* Network reliability layer: bounded retries, short JSON cache, request coalescing and timeouts. */
+const driftNativeFetch=window.fetch.bind(window),driftApiCache=new Map(),driftApiPending=new Map();
+const driftApiHosts=new Set(['valhalla1.openstreetmap.de','nominatim.openstreetmap.org','en.wikipedia.org','services.swpc.noaa.gov','marine-api.open-meteo.com','api.open-meteo.org','archive-api.open-meteo.org','query.wikidata.org','overpass-api.de','overpass.kumi.systems','api.inaturalist.org','www.loc.gov','archive.org','macrostrat.org']);
+function driftApiKey(url,method,body){return method+' '+url+(body?' '+(typeof body==='string'?body:'[body]'):'')}
+window.fetch=async function(input,init){
+ const url=typeof input==='string'?input:input.url,method=String((init&&init.method)||(input&&input.method)||'GET').toUpperCase();
+ let host='';try{host=new URL(url,location.href).hostname}catch(e){}
+ if(!driftApiHosts.has(host)||!['GET','POST'].includes(method))return driftNativeFetch(input,init);
+ const body=init&&init.body,cacheable=method==='GET',key=driftApiKey(url,method,body),now=Date.now();
+ if(cacheable){const hit=driftApiCache.get(key);if(hit&&now-hit.t<5*60*1000)return hit.response.clone();if(hit)driftApiCache.delete(key)}
+ if(driftApiPending.has(key))return (await driftApiPending.get(key)).clone();
+ const task=(async()=>{
+  let lastError;
+  for(let attempt=0;attempt<3;attempt++){
+   const controller=new AbortController(),callerSignal=(init&&init.signal)||(input&&input.signal),timeout=setTimeout(()=>controller.abort(new DOMException('Request timed out','TimeoutError')),18000);
+   const abortCaller=()=>controller.abort(callerSignal.reason||new DOMException('Request aborted','AbortError'));
+   if(callerSignal){if(callerSignal.aborted)abortCaller();else callerSignal.addEventListener('abort',abortCaller,{once:true})}
+   try{
+    const opts=Object.assign({},init||{},{signal:controller.signal});
+    const response=await driftNativeFetch(input,opts);
+    if((response.status===429||response.status>=500)&&attempt<2&&!(callerSignal&&callerSignal.aborted)){
+     clearTimeout(timeout);if(callerSignal)callerSignal.removeEventListener('abort',abortCaller);await new Promise(r=>setTimeout(r,450*(attempt+1)));continue;
+    }
+    if(cacheable&&response.ok&&/application\/(?:[\w.+-]*\+)?json/i.test(response.headers.get('content-type')||'')){
+     driftApiCache.set(key,{t:Date.now(),response:response.clone()});while(driftApiCache.size>60)driftApiCache.delete(driftApiCache.keys().next().value);
+    }
+    clearTimeout(timeout);if(callerSignal)callerSignal.removeEventListener('abort',abortCaller);return response;
+   }catch(error){lastError=error;clearTimeout(timeout);if(callerSignal)callerSignal.removeEventListener('abort',abortCaller);if((callerSignal&&callerSignal.aborted)||attempt===2)throw error;await new Promise(r=>setTimeout(r,450*(attempt+1)))}
+  }
+  throw lastError||new TypeError('Network request failed');
+ })();
+ driftApiPending.set(key,task);
+ try{return (await task).clone()}finally{driftApiPending.delete(key)}
+};
+window.addEventListener('offline',()=>{if(typeof say==='function')say('You are offline. Cached information may still be available; live map and lookup requests need a connection.',1)});
+window.addEventListener('online',()=>{if(typeof say==='function')say('Connection restored. You can retry the lookup.',1)});
 let origin=null,home=null,dest=null,mode=1,routeLayer=null,activeTripRoute=null,lastTripRouteAt=0,lastTripRouteStart=null,geoRequest=0;
 const map=L.map('map',{zoomControl:false}).setView([39,-98],4),pins=L.layerGroup().addTo(map);
 const MAP_KEY='';/* optional: paste a CARTO key here to use their dark tiles */
@@ -200,6 +236,7 @@ L.tileLayer(MAP_KEY?'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?a
 const hint=document.createElement('div');hint.id='hint';hint.setAttribute('role','status');hint.style.display='none';$('map').appendChild(hint);
 function say(t,keep){hint.textContent=t;hint.style.display='block';clearTimeout(say.t);if(!keep)say.t=setTimeout(()=>{hint.style.display='none'},5000)}
 function needStart(){if(window.driftOffline){say('The map could not load, so places cannot be shown. Journal, sky and settings still work.',1);return}$('m').textContent='Tap the map to set your starting point';say('Tap the map to set your starting point',1)}
+if(!navigator.onLine)say('You appear to be offline. Cached information may still be available; live map and lookup requests need a connection.',1);
 
 function hash(s){let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
 function seeded(a){return()=>{let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296}}
@@ -287,7 +324,7 @@ function usRand(){const r=Math.random(),b=US_BOX[r<.82?0:r<.93?1:2];return{lat:b
 /* roads, paths and park edges */
 async function roads(p,r){
  const f=k=>`way(around:${r},${p.lat},${p.lon})${k};`,
- q=`[out:json][timeout:15];(${f('["highway"~"^(residential|unclassified|tertiary|secondary|service|track|path|footway|cycleway|bridleway|living_street|pedestrian)$"]["access"!~"^(private|no)$"]["foot"!="no"]')}${f('["leisure"~"^(park|nature_reserve)$"]')});out geom 60;`;
+ q=`[out:json][timeout:15];(${f('["highway"~"^(residential|unclassified|tertiary|secondary|service|track|path|footway|cycleway|bridleway|living_street|pedestrian)$"]["access"!~"^(private|no)$"]["foot"!="no"]')}${f('["leisure"~"^(park|nature_reserve)$"]["access"!~"^(private|no)$"]["foot"!="no"]')});out geom 60;`;
  try{const j=await ovp(q,8000),o=[];if(!j)return[];
   for(const e of j.elements)for(const g of e.geometry||[])o.push({lat:g.lat,lon:g.lon,name:(e.tags||{}).name||''});
   return o.slice(0,4000)}catch(e){return[]}}
@@ -400,12 +437,12 @@ function titleIndex(state){const k=lw(state);if(!k)return Promise.resolve({err:'
  if(!tiP.has(k))tiP.set(k,loadTitles(k).then(o=>{if(o.err)tiP.delete(k);return o}));return tiP.get(k)}
 
 const jc=new Map();
-async function getJ(u){if(jc.has(u))return jc.get(u);let o;
+async function getJ(u){const cached=jc.get(u);if(cached&&Date.now()-cached.t<6*60*60*1000)return cached.o;if(cached)jc.delete(u);let o;
  for(let a=0;a<2;a++){
   try{const r=await fetch(u,{signal:AbortSignal.timeout?AbortSignal.timeout(a?20000:12000):undefined});o=r.ok?{j:await r.json()}:{err:'HTTP '+r.status}}catch(e){o={err:e&&e.name==='TimeoutError'?'timed out':'blocked or offline'}}
   if(!o.err||o.err==='HTTP 429'||o.err==='HTTP 403'||o.err==='blocked or offline')break;
   await new Promise(r=>setTimeout(r,800))}
- if(!o.err&&!(o.j&&Array.isArray(o.j.results)))o={err:'unexpected reply'};if(!o.err)jc.set(u,o);return o}
+ if(!o.err&&!(o.j&&Array.isArray(o.j.results)))o={err:'unexpected reply'};if(!o.err){jc.set(u,{t:Date.now(),o});while(jc.size>80)jc.delete(jc.keys().next().value)}return o}
 
 let nb=null;
 async function nearClip(t,box){const L=await locate(t);if(!box.isConnected)return;if(L)t.loc=Object.assign({},L,{city:t.town});await clip(t,box)}
@@ -448,7 +485,7 @@ async function spawn(){
  const txt=$('intent').value.trim();if(mode==2&&!txt){$('intent').focus();return}
  $('go').disabled=true;$('go').textContent='Searching';const hold=sigil(mode==2?txt:String(Date.now()));$('rmap').style.display='';$('walk').style.display='';
  const rng=mode==2?seeded(hash(txt+Date.now())):Math.random,Rm=miles()*1609.34,iw=mode==2?word(txt):0;let hit=null,raw;dkP=null;
- if(mode==3){hit=await dreamPoint();if(!hit){say('Could not find a story-rich dream destination inside the selected area. Turn off U.S. only or try again.');return}}
+ if(mode==3){say('Finding a story-rich destination…',1);hit=await dreamPoint();if(!hit){say('Could not find a story-rich dream destination inside the selected area. Turn off U.S. only or try again.');return}}
  let rawOK=null;
  for(let i=0;i<(cfg.us?8:3)&&!hit&&mode!=3;i++){
   raw=kind==4?await darkRaw(origin,Rm,rng):pickRaw(origin,Rm,rng);
@@ -463,7 +500,7 @@ async function spawn(){
   say('Checking mapped routes…',1);
   for(let attempt=0;attempt<3;attempt++){
    routed=await getRoute(origin,dest,tm);
-   if(routed&&routed.ok)break;
+   if(routed&&routed.ok){say('Route found — gathering local details…',1);break}
    if(!routed||routed.unavailable){routeUnavailable=true;break}
    if(!routed.noRoute||attempt===2)break;
    let candidate=kind==4?await darkRaw(origin,Rm,rng):pickRaw(origin,Rm,rng);if(!candidate)break;
@@ -473,7 +510,7 @@ async function spawn(){
    dest=candidate;dest.road=!!cfg.safe;
   }
   if(routed&&routed.noRoute){say('Could not find a connected mapped route after three tries. Try a wider radius, another travel mode, or move your start.');return}
-  if(routeUnavailable)routed=null;
+  if(routeUnavailable){routed=null;say('Routing service unavailable — using a straight-line reference while gathering details…',1)}
  }
  dest.route=routed;
  const T=await threads(dest),k=T.nt.k,place=T.pg?T.pg.title:(dest.name||dest.town);
@@ -493,7 +530,7 @@ async function spawn(){
  if(T.nt.a&&T.pg&&(!iw||T.nt.k==iw%10))$('th').insertAdjacentHTML('afterbegin','<p><b>Alignment.</b> '+(iw?'Your words, ':'')+'an angel number and a local story all line up here.</p>');
  $('rmap').href=`https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lon}&destination=${dest.lat},${dest.lon}&travelmode=${['walking','bicycling','driving'][tm]}`;
  if(mode==3){$('rd').textContent='An armchair visit, no travel needed. It is '+(cfg.metric?(d/1000).toFixed(1)+' km':(d/1609.34).toFixed(1)+' miles')+' from your starting point.';$('rmap').style.display='none';$('walk').style.display='none'}
- $('result').style.display='block';paint();wx(dest);
+ $('result').style.display='block';paint();wx(dest);hint.style.display='none';
  $('go').disabled=false;$('go').textContent='Find another'}
 $('go').onclick=async()=>{try{await spawn()}catch(e){say('Something went wrong: '+(e&&e.message||e))}finally{$('sg').style.display='none';$('go').disabled=false;if($('go').textContent==='Searching')$('go').textContent='Find a place'}};
 $('loc').onclick=()=>{if(!navigator.geolocation){needStart();return}const req=++geoRequest;say('Waiting for your location…',1);navigator.geolocation.getCurrentPosition(g=>{if(req===geoRequest)setOrigin({lat:g.coords.latitude,lon:g.coords.longitude})},()=>{if(req===geoRequest)needStart()},{timeout:12000,maximumAge:60000})};
@@ -503,8 +540,8 @@ let journalCache=(()=>{try{const a=JSON.parse(localStorage.drift||'[]');return A
 function openJournalDb(){if(!('indexedDB'in window))return Promise.resolve(null);return new Promise(resolve=>{try{const q=indexedDB.open('DriftJournal',1);q.onupgradeneeded=()=>{if(!q.result.objectStoreNames.contains('journal'))q.result.createObjectStore('journal')};q.onsuccess=()=>{journalDb=q.result;resolve(journalDb)};q.onerror=()=>resolve(null)}catch(e){resolve(null)}})}
 function idbJournal(mode,value){return openJournalDb().then(db=>new Promise(resolve=>{if(!db)return resolve(false);try{const tx=db.transaction('journal','readwrite');if(mode==='put')tx.objectStore('journal').put({saved:Date.now(),entries:value},'main');else{const r=tx.objectStore('journal').get('main');r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>resolve(null);return}tx.oncomplete=()=>resolve(true);tx.onerror=()=>resolve(false)}catch(e){resolve(false)}}))}
 const load=()=>journalCache;
-function save(a){journalCache=Array.isArray(a)?a:[];let ok=false;try{localStorage.drift=JSON.stringify(journalCache);localStorage.setItem('driftSavedAt',String(Date.now()));ok=true}catch(e){}idbJournal('put',journalCache).then(saved=>{if(!ok&&!saved)say('Your device storage is full. Export your journal before adding more media.',1)});return true}
-openJournalDb().then(db=>{if(!db)return;idbJournal('get').then(v=>{if(v&&Array.isArray(v.entries)&&(!journalCache.length||v.saved>Date.parse(localStorage.getItem('driftSavedAt')||0))){journalCache=v.entries;try{localStorage.drift=JSON.stringify(journalCache)}catch(e){}if($('journal').style.display==='block')renderJ();fog()}})});
+function save(a){journalCache=Array.isArray(a)?a:[];const snapshot=journalCache,savedAt=Date.now();openJournalDb().then(db=>{if(db){idbJournal('put',snapshot).then(ok=>{if(ok){try{localStorage.setItem('driftSavedAt',String(savedAt));localStorage.removeItem('drift')}catch(e){}}else{try{localStorage.setItem('drift',JSON.stringify(snapshot));localStorage.setItem('driftSavedAt',String(savedAt))}catch(e){say('Journal backup failed. Export your entries before closing Drift.',1)}}})}else{try{localStorage.setItem('drift',JSON.stringify(snapshot));localStorage.setItem('driftSavedAt',String(savedAt))}catch(e){say('Device storage is full or unavailable. Export your journal before closing Drift.',1)}}});return true}
+openJournalDb().then(db=>{if(!db)return;idbJournal('get').then(v=>{if(v&&Array.isArray(v.entries)){if(!journalCache.length||v.saved>Date.parse(localStorage.getItem('driftSavedAt')||0)){journalCache=v.entries;try{localStorage.setItem('driftSavedAt',String(v.saved));localStorage.removeItem('drift')}catch(e){}if($('journal').style.display==='block')renderJ();fog()}}else if(journalCache.length){idbJournal('put',journalCache)}})});
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let journalQuery='';
 function renderJ0(){
